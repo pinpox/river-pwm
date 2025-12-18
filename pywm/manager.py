@@ -95,6 +95,10 @@ class WindowManager:
             min(wm_global.version, RiverWindowManagerV1.VERSION)
         )
 
+        # Register the wm object so events are dispatched to it
+        wm_obj = ProtocolObject(self.wm_id, RiverWindowManagerV1.INTERFACE)
+        self.connection.register_object(wm_obj)
+
         # Bind to river_xkb_bindings_v1 if available
         xkb_global = self._find_global(RiverXkbBindingsV1.INTERFACE)
         if xkb_global:
@@ -113,8 +117,9 @@ class WindowManager:
                 min(layer_shell_global.version, RiverLayerShellV1.VERSION)
             )
 
-        # Set up event handling
-        self.connection.on_event(RiverWindowManagerV1.INTERFACE, 'dispatch', self._dispatch_wm_event)
+        # Set up event handling - register handlers for each event type
+        for opcode in range(9):  # Events 0-8
+            self.connection.on_event(RiverWindowManagerV1.INTERFACE, opcode, self._dispatch_wm_event)
 
         # Roundtrip to get initial state
         if not self.connection.roundtrip():
