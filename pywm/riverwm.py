@@ -414,14 +414,19 @@ class RiverWM:
                 workspace.focused_window = self.focused_window
 
         # Propose dimensions for all windows
-        if self.focused_output:
+        if self.focused_output and self.focused_output.width > 0 and self.focused_output.height > 0:
             print(f"[DEBUG] Output dimensions: {self.focused_output.width}x{self.focused_output.height}")
             geometries = self.layout_manager.calculate_layout(self.focused_output)
             print(f"[DEBUG] Proposing dimensions for {len(geometries)} windows")
             for window, geom in geometries.items():
-                print(f"[DEBUG] Window {window.object_id:x}: proposing dimensions {geom.width}x{geom.height}")
-                window.propose_dimensions(geom.width, geom.height)
+                # Ensure dimensions are positive
+                width = max(1, geom.width)
+                height = max(1, geom.height)
+                print(f"[DEBUG] Window {window.object_id:x}: proposing dimensions {width}x{height}")
+                window.propose_dimensions(width, height)
                 window.set_tiled(geom.tiled_edges)
+        else:
+            print(f"[DEBUG] Skipping dimension proposal - output not ready or has invalid dimensions")
 
         # Finish manage sequence
         self.manager.manage_finish()
