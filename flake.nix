@@ -3,9 +3,11 @@
 
   # Nixpkgs / NixOS version to use.
   inputs.nixpkgs.url = "nixpkgs/nixos-unstable";
+  inputs.river-src.url = "github:riverwm/river";
+  inputs.river-src.flake = false;
 
   outputs =
-    { self, nixpkgs }:
+    { self, nixpkgs, river-src }:
     let
 
       # to work with older version of flakes
@@ -71,12 +73,7 @@
               "man"
             ];
 
-            src = pkgs.fetchFromGitHub {
-              owner = "riverwm";
-              repo = "river";
-              rev = "673f8772479b2adf6eb1d812cb54d7623d800dc1";
-              hash = "sha256-MeMjk0i773nYzDSwhKBMEpfEt+8Pqgy4Z+b+YM+c8s0=";
-            };
+            src = river-src;
 
             deps = pkgs.callPackage ./build.zig.zon.nix { };
 
@@ -201,55 +198,44 @@
                   # Use Alt (MOD1) instead of Super (MOD4) for nested mode
                   config = RiverConfig(mod=Modifiers.MOD1)
                   print(f"[pywm-nested] Config created with mod={config.mod}")
-                  wm = RiverWM(config)
-                  print("[pywm-nested] RiverWM instance created")
 
-                  # Add comprehensive logging hooks
+                  # Hook the manager callbacks BEFORE creating RiverWM
+                  # (RiverWM.__init__ calls _setup_callbacks which assigns these)
                   class TerminalSpawner:
                       def __init__(self):
                           self.spawned = False
+                          self.original_on_seat_created = None
+
+                      def on_seat_with_terminal(self, seat):
+                          print(f"[pywm-nested] Seat created: {seat}", flush=True)
+                          if self.original_on_seat_created:
+                              self.original_on_seat_created(seat)
+                          if not self.spawned:
+                              self.spawned = True
+                              print("[pywm-nested] Spawning terminal...", flush=True)
+                              try:
+                                  result = subprocess.Popen(
+                                      ["${pkgs.foot}/bin/foot"],
+                                      start_new_session=True
+                                  )
+                                  print(f"[pywm-nested] Terminal spawned with PID: {result.pid}", flush=True)
+                              except Exception as e:
+                                  print(f"[pywm-nested] ERROR spawning terminal: {e}", flush=True)
+                                  import traceback
+                                  traceback.print_exc()
 
                   spawner = TerminalSpawner()
 
-                  # Hook all the callbacks with logging
-                  original_on_window_created = wm._on_window_created
-                  def on_window_created_logged(window):
-                      print(f"[pywm-nested] Window created: {window}")
-                      return original_on_window_created(window)
-                  wm._on_window_created = on_window_created_logged
+                  # Create custom RiverWM that overrides _setup_callbacks
+                  class RiverWMNested(RiverWM):
+                      def _setup_callbacks(self):
+                          super()._setup_callbacks()
+                          # Now wrap the callbacks
+                          spawner.original_on_seat_created = self.manager.on_seat_created
+                          self.manager.on_seat_created = lambda seat: spawner.on_seat_with_terminal(seat)
 
-                  original_on_output_created = wm._on_output_created
-                  def on_output_created_logged(output):
-                      print(f"[pywm-nested] Output created: {output}")
-                      return original_on_output_created(output)
-                  wm._on_output_created = on_output_created_logged
-
-                  original_on_seat_created = wm._on_seat_created
-                  def on_seat_with_terminal(seat):
-                      print(f"[pywm-nested] Seat created: {seat}")
-                      original_on_seat_created(seat)
-                      if not spawner.spawned:
-                          spawner.spawned = True
-                          print("[pywm-nested] Spawning terminal...")
-                          try:
-                              result = subprocess.Popen(
-                                  ["${pkgs.foot}/bin/foot"],
-                                  start_new_session=True,
-                                  stdout=subprocess.PIPE,
-                                  stderr=subprocess.PIPE
-                              )
-                              print(f"[pywm-nested] Terminal spawned with PID: {result.pid}")
-                          except Exception as e:
-                              print(f"[pywm-nested] ERROR spawning terminal: {e}")
-                              import traceback
-                              traceback.print_exc()
-                  wm._on_seat_created = on_seat_with_terminal
-
-                  original_on_manage_start = wm._on_manage_start
-                  def on_manage_start_logged():
-                      print(f"[pywm-nested] Manage start - windows: {len(wm.manager.windows)}, outputs: {len(wm.manager.outputs)}, seats: {len(wm.manager.seats)}")
-                      return original_on_manage_start()
-                  wm._on_manage_start = on_manage_start_logged
+                  wm = RiverWMNested(config)
+                  print("[pywm-nested] RiverWM instance created")
 
                   # Hook _dispatch_wm_event to see if events are arriving
                   original_dispatch_wm_event = wm.manager._dispatch_wm_event

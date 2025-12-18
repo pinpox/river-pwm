@@ -204,13 +204,17 @@ class WindowManager:
                 self.on_session_unlocked()
 
         elif msg.opcode == RiverWindowManagerV1.Event.WINDOW:
+            print(f"[DEBUG] Handling WINDOW event, payload: {msg.payload.hex()}")
             window_id = decoder.new_id()
+            print(f"[DEBUG] Creating window with id={window_id} (0x{window_id:x})")
             window = Window(window_id, self)
             self.windows[window_id] = window
             self.connection.register_object(window)
             window.on_closed = lambda w=window: self._on_window_closed(w)
+            print(f"[DEBUG] Calling on_window_created callback")
             if self.on_window_created:
                 self.on_window_created(window)
+            print(f"[DEBUG] Window created successfully")
 
         elif msg.opcode == RiverWindowManagerV1.Event.OUTPUT:
             print(f"[DEBUG] Handling OUTPUT event")
