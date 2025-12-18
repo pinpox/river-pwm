@@ -180,8 +180,8 @@
             echo "Key bindings: Alt + Return (terminal), Alt + Q (close), Alt + Shift + Q (quit)"
             echo ""
 
-            # Use cage to create a windowed environment for River
-            ${pkgs.cage}/bin/cage -d -- ${self.packages.${system}.river}/bin/river -c "${self.packages.${system}.pywm}/bin/pywm"
+            # River auto-detects nested mode when WAYLAND_DISPLAY or DISPLAY is set
+            ${self.packages.${system}.river}/bin/river -c "${self.packages.${system}.pywm}/bin/pywm"
           '';
 
           default = self.packages.${system}.river;
