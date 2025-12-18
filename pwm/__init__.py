@@ -71,6 +71,7 @@ from .layout import (
 from .riverwm import (
     RiverWM,
     RiverConfig,
+    DecorationPosition,
     XKB,
     BTN,
 )
@@ -116,6 +117,7 @@ __all__ = [
     # Window Manager
     "RiverWM",
     "RiverConfig",
+    "DecorationPosition",
     "XKB",
     "BTN",
 ]

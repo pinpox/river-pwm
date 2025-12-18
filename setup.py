@@ -9,6 +9,9 @@ setup(
     license="ISC",
     packages=find_packages(),
     python_requires=">=3.8",
+    install_requires=[
+        "pycairo>=1.20.0",
+    ],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: End Users/Desktop",

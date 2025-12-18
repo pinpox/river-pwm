@@ -31,6 +31,7 @@ from .protocol import (
     RiverXkbBindingV1,
     RiverLayerShellOutputV1,
     RiverLayerShellSeatV1,
+    RiverDecorationV1,
 )
 
 if TYPE_CHECKING:
@@ -78,6 +79,10 @@ class Window(ProtocolObject):
 
         # Node for rendering
         self.node: Optional[Node] = None
+
+        # Server-side decorations
+        self.decoration: Optional["Decoration"] = None
+        self.use_ssd_enabled: bool = False
 
         # Pending requests from window
         self.pending_pointer_move: Optional["Seat"] = None
@@ -276,6 +281,222 @@ class Window(ProtocolObject):
         self.state = WindowState.NORMAL
         self.fullscreen_output = None
         self.manager.send_request(self.object_id, RiverWindowV1.Request.EXIT_FULLSCREEN)
+
+    def enable_ssd(self, style: "DecorationStyle"):
+        """Enable server-side decorations for this window.
+
+        Args:
+            style: Decoration style configuration
+        """
+        self.use_ssd_enabled = True
+        # Send use_ssd request to River
+        self.manager.send_request(self.object_id, RiverWindowV1.Request.USE_SSD)
+
+        # Create decoration object (will be initialized during render)
+        self.decoration = Decoration(self, style, self.manager.connection)
+
+    def on_render_start(self):
+        """Called during render start to initialize/update decoration."""
+        if self.decoration and not self.decoration.created:
+            # Create decoration surface if not already created
+            print(f"DEBUG: Creating decoration for window {self.object_id}, width={self.width}")
+            self.decoration.create(self.width)
+        elif self.decoration and self.decoration.created:
+            # Resize if window width changed
+            if self.width != self.decoration.width:
+                print(f"DEBUG: Resizing decoration from {self.decoration.width} to {self.width}")
+                self.decoration.resize(self.width)
+
+    def on_render_finish(self):
+        """Called during render to commit decoration."""
+        if self.decoration and self.decoration.created:
+            print(f"DEBUG: Rendering decoration for window {self.object_id}, title={self.title}")
+            # Set offset and synchronize with window commit
+            self.decoration.set_offset_and_sync()
+            # Render the decoration
+            self.decoration.render(
+                self.title or "Untitled",
+                focused=False,  # TODO: track focus state
+                maximized=(self.state == WindowState.MAXIMIZED),
+            )
+
+
+class Decoration:
+    """Manages a decoration surface for a window."""
+
+    def __init__(
+        self,
+        window: Window,
+        style: "DecorationStyle",
+        connection: "WaylandConnection",
+    ):
+        """Initialize the decoration.
+
+        Args:
+            window: Parent window
+            style: Decoration style
+            connection: Wayland connection
+        """
+        from .decoration import DecorationRenderer
+        from .wayland import WlCompositor, WlSurface
+        from .shm import ShmPool, WlShm
+
+        self.window = window
+        self.style = style
+        self.connection = connection
+        self.renderer = DecorationRenderer(style)
+
+        # Surface and protocol objects
+        self.surface: Optional[WlSurface] = None
+        self.decoration_obj: Optional[ProtocolObject] = None
+        self.pool: Optional[ShmPool] = None
+        self.buffer = None
+
+        self.width = 0
+        self.created = False
+
+    def create(self, window_width: int):
+        """Create the decoration surface and buffers.
+
+        Args:
+            window_width: Width of the parent window
+        """
+        from .wayland import WlCompositor
+        from .shm import ShmPool, WlShm
+
+        self.width = window_width
+        height = self.style.height
+
+        # Create wl_surface
+        compositor = WlCompositor(self.connection.compositor_id, self.connection)
+        self.surface = compositor.create_surface()
+
+        # Create river_decoration_v1
+        # Determine position and use appropriate request
+        if self.style.position == "top":
+            decoration_id = self.connection.allocate_id()
+            payload = MessageEncoder().new_id(decoration_id).object(self.surface).bytes()
+            self.connection.send_message(
+                self.window.object_id,
+                RiverWindowV1.Request.GET_DECORATION_ABOVE,
+                payload,
+            )
+        else:  # bottom
+            decoration_id = self.connection.allocate_id()
+            payload = MessageEncoder().new_id(decoration_id).object(self.surface).bytes()
+            self.connection.send_message(
+                self.window.object_id,
+                RiverWindowV1.Request.GET_DECORATION_BELOW,
+                payload,
+            )
+
+        self.decoration_obj = ProtocolObject(decoration_id, RiverDecorationV1.INTERFACE)
+        self.connection.register_object(self.decoration_obj)
+
+        # Create shared memory pool and buffer
+        stride = window_width * 4  # ARGB32 = 4 bytes per pixel
+        size = stride * height
+
+        self.pool = ShmPool(self.connection, size)
+        self.buffer = self.pool.create_buffer(0, window_width, height, stride, WlShm.FORMAT_ARGB8888)
+
+        self.created = True
+
+    def render(self, title: str, focused: bool, maximized: bool):
+        """Render the decoration.
+
+        Args:
+            title: Window title
+            focused: Whether window is focused
+            maximized: Whether window is maximized
+        """
+        if not self.created or not self.pool:
+            return
+
+        # Get shared memory for writing
+        shm_data = self.pool.get_data()
+
+        # Render with Cairo
+        self.renderer.render(self.width, title, focused, maximized, shm_data)
+
+        # Attach buffer to surface
+        self.surface.attach(self.buffer)
+
+        # Mark entire surface as damaged
+        self.surface.damage_buffer(0, 0, self.width, self.style.height)
+
+        # Commit surface
+        self.surface.commit()
+
+    def set_offset_and_sync(self):
+        """Set decoration offset and synchronize with next window commit."""
+        if not self.created or not self.decoration_obj:
+            return
+
+        # Calculate offset based on position
+        if self.style.position == "top":
+            # Top decoration: negative Y offset (above window)
+            x, y = 0, -self.style.height
+        else:
+            # Bottom decoration: positive Y offset (below window)
+            x, y = 0, self.window.height
+
+        # Send set_offset request
+        payload = MessageEncoder().int32(x).int32(y).bytes()
+        self.connection.send_message(
+            self.decoration_obj.object_id,
+            RiverDecorationV1.Request.SET_OFFSET,
+            payload,
+        )
+
+        # Send sync_next_commit request
+        self.connection.send_message(
+            self.decoration_obj.object_id, RiverDecorationV1.Request.SYNC_NEXT_COMMIT
+        )
+
+    def resize(self, new_width: int):
+        """Resize the decoration buffers.
+
+        Args:
+            new_width: New width in pixels
+        """
+        if not self.created:
+            return
+
+        from .shm import ShmPool
+        from .wayland import WlShm
+
+        self.width = new_width
+        height = self.style.height
+        stride = new_width * 4
+        size = stride * height
+
+        # Recreate pool and buffer
+        if self.pool:
+            self.pool.destroy()
+
+        self.pool = ShmPool(self.connection, size)
+        self.buffer = self.pool.create_buffer(0, new_width, height, stride, WlShm.FORMAT_ARGB8888)
+
+    def destroy(self):
+        """Clean up the decoration."""
+        if self.buffer:
+            self.buffer.destroy_request()
+
+        if self.pool:
+            self.pool.destroy()
+
+        if self.decoration_obj:
+            payload = b""
+            self.connection.send_message(
+                self.decoration_obj.object_id, RiverDecorationV1.Request.DESTROY, payload
+            )
+            self.connection.unregister_object(self.decoration_obj.object_id)
+
+        if self.surface:
+            self.surface.destroy_request()
+
+        self.created = False
 
 
 class Node(ProtocolObject):

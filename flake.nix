@@ -58,6 +58,8 @@
 
             format = "setuptools";
 
+            propagatedBuildInputs = [ pkgs.python3Packages.pycairo ];
+
             meta = {
               description = "Python library for River window management protocol";
               license = pkgs.lib.licenses.isc;
@@ -154,6 +156,11 @@
 
             export PWM_TERMINAL="${pkgs.foot}/bin/foot"
             export PWM_LAUNCHER="${pkgs.fuzzel}/bin/fuzzel"
+
+            # Keyboard layout configuration
+            export XKB_DEFAULT_LAYOUT="''${XKB_DEFAULT_LAYOUT:-us}"
+            export XKB_DEFAULT_VARIANT="''${XKB_DEFAULT_VARIANT:-colemak}"
+            export XKB_DEFAULT_OPTIONS="''${XKB_DEFAULT_OPTIONS:-terminate:ctrl_alt_bksp}"
 
             # Detect if running in nested mode (inside another compositor)
             if [ -n "$WAYLAND_DISPLAY" ] || [ -n "$DISPLAY" ]; then

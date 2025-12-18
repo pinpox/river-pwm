@@ -137,6 +137,13 @@ def parse_color(color: str | Tuple[int, int, int, int]) -> Tuple[int, int, int, 
         raise ValueError(f"Invalid color type: {type(color)}. Use hex string or RGBA tuple")
 
 
+class DecorationPosition(Enum):
+    """Position of server-side decorations."""
+
+    TOP = "top"
+    BOTTOM = "bottom"
+
+
 @dataclass
 class RiverConfig:
     """Window manager configuration."""
@@ -149,6 +156,15 @@ class RiverConfig:
     border_width: int = 2
     border_color: str | Tuple[int, int, int, int] = "#4c4c4c"
     focused_border_color: str | Tuple[int, int, int, int] = "#5294e2"
+
+    # Server-side decorations
+    use_ssd: bool = True
+    ssd_position: DecorationPosition = DecorationPosition.BOTTOM
+    ssd_height: int = 24
+    ssd_background_color: str | Tuple[int, int, int, int] = "#2e3440"
+    ssd_focused_background_color: str | Tuple[int, int, int, int] = "#3b4252"
+    ssd_text_color: str | Tuple[int, int, int, int] = "#d8dee9"
+    ssd_button_color: str | Tuple[int, int, int, int] = "#5e81ac"
 
     # Programs
     terminal: str = "foot"
@@ -164,6 +180,10 @@ class RiverConfig:
         """Parse color strings into tuples."""
         self.border_color = parse_color(self.border_color)
         self.focused_border_color = parse_color(self.focused_border_color)
+        self.ssd_background_color = parse_color(self.ssd_background_color)
+        self.ssd_focused_background_color = parse_color(self.ssd_focused_background_color)
+        self.ssd_text_color = parse_color(self.ssd_text_color)
+        self.ssd_button_color = parse_color(self.ssd_button_color)
 
 
 class OpType(Enum):
@@ -234,6 +254,21 @@ class RiverWM:
             | WindowCapabilities.FULLSCREEN
             | WindowCapabilities.MINIMIZE
         )
+
+        # Enable server-side decorations if configured
+        if self.config.use_ssd:
+            from .decoration import DecorationStyle
+
+            print(f"DEBUG: Enabling SSD for window {window.object_id}, title={window.title}")
+            style = DecorationStyle(
+                height=self.config.ssd_height,
+                position=self.config.ssd_position.value,
+                bg_color=self.config.ssd_background_color,
+                focused_bg_color=self.config.ssd_focused_background_color,
+                text_color=self.config.ssd_text_color,
+                button_color=self.config.ssd_button_color,
+            )
+            window.enable_ssd(style)
 
         # Handle window requests
         self._handle_window_requests(window)
@@ -535,6 +570,10 @@ class RiverWM:
                 # Show window
                 window.show()
 
+                # Initialize/update decorations
+                if window.use_ssd_enabled:
+                    window.on_render_start()
+
             # Hide windows not in current workspace
             workspace = self.layout_manager.get_active_workspace(self.focused_output)
             if workspace:
@@ -542,6 +581,12 @@ class RiverWM:
                 for window in self.manager.windows.values():
                     if window not in visible_windows:
                         window.hide()
+
+        # Render decorations before finish
+        # This must happen BEFORE render_finish to synchronize commits
+        for window in self.manager.windows.values():
+            if window.use_ssd_enabled and window.is_visible:
+                window.on_render_finish()
 
         # Finish render sequence
         self.manager.render_finish()

@@ -98,6 +98,19 @@ class WindowManager:
         if not self.connection.roundtrip():
             return False
 
+        # Bind to core Wayland protocols
+        compositor_global = self._find_global("wl_compositor")
+        if compositor_global:
+            self.connection.compositor_id = self.connection.bind_global(
+                compositor_global.name, "wl_compositor", compositor_global.version
+            )
+
+        shm_global = self._find_global("wl_shm")
+        if shm_global:
+            self.connection.shm_id = self.connection.bind_global(
+                shm_global.name, "wl_shm", shm_global.version
+            )
+
         # Bind to river_window_manager_v1
         wm_global = self._find_global(RiverWindowManagerV1.INTERFACE)
         if not wm_global:

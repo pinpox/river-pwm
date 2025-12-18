@@ -184,6 +184,17 @@ class MessageEncoder:
             self.data.extend(b"\x00" * padding)
         return self
 
+    def fd(self, fd: int) -> "MessageEncoder":
+        """Mark that a file descriptor will be sent.
+
+        File descriptors are sent via SCM_RIGHTS ancillary data, not in the
+        message payload. This method just records that an FD should be sent.
+        """
+        if not hasattr(self, 'fds'):
+            self.fds = []
+        self.fds.append(fd)
+        return self
+
     def bytes(self) -> bytes:
         return bytes(self.data)
 

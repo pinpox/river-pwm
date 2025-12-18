@@ -13,6 +13,7 @@ from typing import Callable, Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, field
 
 from .protocol import WaylandMessage, MessageEncoder, MessageDecoder, ProtocolObject
+import array
 
 
 @dataclass
@@ -59,12 +60,19 @@ class WaylandConnection:
         self.registry_id: Optional[int] = None
         self.globals: Dict[int, GlobalInfo] = {}
 
+        # Core Wayland objects
+        self.compositor_id: Optional[int] = None
+        self.shm_id: Optional[int] = None
+
         # Event handlers
         self._event_handlers: Dict[str, Dict[int, Callable]] = {}
 
         # Sync callbacks
         self._sync_callbacks: Dict[int, Callable] = {}
         self._sync_serial = 0
+
+        # File descriptors to send
+        self._send_fds: List[int] = []
 
     def connect(self, display_name: Optional[str] = None) -> bool:
         """Connect to the Wayland display."""
@@ -112,10 +120,21 @@ class WaylandConnection:
         """Get a registered protocol object."""
         return self._objects.get(obj_id)
 
-    def send_message(self, object_id: int, opcode: int, payload: bytes = b""):
-        """Queue a message to be sent."""
+    def send_message(self, object_id: int, opcode: int, payload: bytes = b"", fds: Optional[List[int]] = None):
+        """Queue a message to be sent.
+
+        Args:
+            object_id: Target object ID
+            opcode: Request opcode
+            payload: Message payload bytes
+            fds: Optional list of file descriptors to send with this message
+        """
         msg = WaylandMessage(object_id, opcode, payload)
         self.send_buffer.extend(msg.encode())
+
+        # Queue file descriptors if provided
+        if fds:
+            self._send_fds.extend(fds)
 
     def flush(self) -> bool:
         """Send all queued messages."""
@@ -123,7 +142,16 @@ class WaylandConnection:
             return True
 
         try:
-            sent = self.socket.send(bytes(self.send_buffer))
+            # Send with file descriptors if any are queued
+            if self._send_fds:
+                # Use sendmsg to send data with file descriptors via SCM_RIGHTS
+                fds_array = array.array("i", self._send_fds)
+                ancdata = [(socket.SOL_SOCKET, socket.SCM_RIGHTS, fds_array)]
+                sent = self.socket.sendmsg([bytes(self.send_buffer)], ancdata)
+                self._send_fds.clear()
+            else:
+                sent = self.socket.send(bytes(self.send_buffer))
+
             self.send_buffer = self.send_buffer[sent:]
             return len(self.send_buffer) == 0
         except BlockingIOError:
