@@ -217,9 +217,9 @@ class WindowManager:
             print(f"[DEBUG] Window created successfully")
 
         elif msg.opcode == RiverWindowManagerV1.Event.OUTPUT:
-            print(f"[DEBUG] Handling OUTPUT event")
+            print(f"[DEBUG] Handling OUTPUT event, payload: {msg.payload.hex()}")
             output_id = decoder.new_id()
-            print(f"[DEBUG] Creating output with id={output_id}")
+            print(f"[DEBUG] Creating output with id={output_id} (0x{output_id:x})")
             output = Output(output_id, self)
             self.outputs[output_id] = output
             self.connection.register_object(output)
