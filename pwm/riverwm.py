@@ -102,6 +102,41 @@ class BTN:
     MIDDLE = 0x112
 
 
+def parse_color(color: str | Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    """
+    Parse a color value into RGBA tuple.
+
+    Accepts:
+    - Hex string: "#RRGGBB" or "#RRGGBBAA" (e.g., "#4c4c4c" or "#4c4c4cff")
+    - Tuple: (R, G, B, A) where each value is 0-255
+
+    Returns:
+    - Tuple of (R, G, B, A) values from 0-255
+    """
+    if isinstance(color, str):
+        # Remove '#' prefix if present
+        color = color.lstrip('#')
+
+        # Parse RGB or RGBA
+        if len(color) == 6:
+            # RGB format - add full opacity
+            r, g, b = int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16)
+            return (r, g, b, 0xFF)
+        elif len(color) == 8:
+            # RGBA format
+            r = int(color[0:2], 16)
+            g = int(color[2:4], 16)
+            b = int(color[4:6], 16)
+            a = int(color[6:8], 16)
+            return (r, g, b, a)
+        else:
+            raise ValueError(f"Invalid color format: {color}. Use #RRGGBB or #RRGGBBAA")
+    elif isinstance(color, tuple) and len(color) == 4:
+        return color
+    else:
+        raise ValueError(f"Invalid color type: {type(color)}. Use hex string or RGBA tuple")
+
+
 @dataclass
 class RiverConfig:
     """Window manager configuration."""
@@ -112,8 +147,8 @@ class RiverConfig:
     # Layout settings
     gap: int = 4
     border_width: int = 2
-    border_color: Tuple[int, int, int, int] = (0x4C, 0x4C, 0x4C, 0xFF)
-    focused_border_color: Tuple[int, int, int, int] = (0x52, 0x94, 0xE2, 0xFF)
+    border_color: str | Tuple[int, int, int, int] = "#4c4c4c"
+    focused_border_color: str | Tuple[int, int, int, int] = "#5294e2"
 
     # Programs
     terminal: str = "foot"
@@ -124,6 +159,11 @@ class RiverConfig:
 
     # Focus follows mouse
     focus_follows_mouse: bool = True
+
+    def __post_init__(self):
+        """Parse color strings into tuples."""
+        self.border_color = parse_color(self.border_color)
+        self.focused_border_color = parse_color(self.focused_border_color)
 
 
 class OpType(Enum):
@@ -482,17 +522,14 @@ class RiverWM:
                 prev_node = node
 
                 # Set borders
+                # Always show borders on all edges regardless of tiling state
                 if window == self.focused_window:
                     window.set_borders(
-                        self._make_border_config(
-                            geom.tiled_edges, self.config.focused_border_color
-                        )
+                        self._make_border_config(self.config.focused_border_color)
                     )
                 else:
                     window.set_borders(
-                        self._make_border_config(
-                            geom.tiled_edges, self.config.border_color
-                        )
+                        self._make_border_config(self.config.border_color)
                     )
 
                 # Show window
@@ -510,23 +547,28 @@ class RiverWM:
         self.manager.render_finish()
 
     def _make_border_config(
-        self, edges: WindowEdges, color: Tuple[int, int, int, int]
+        self, color: Tuple[int, int, int, int]
     ) -> BorderConfig:
         """Create a border configuration."""
-        if edges == WindowEdges.NONE:
-            edges = (
-                WindowEdges.TOP
-                | WindowEdges.BOTTOM
-                | WindowEdges.LEFT
-                | WindowEdges.RIGHT
-            )
+        # Always show borders on all edges
+        edges = (
+            WindowEdges.TOP
+            | WindowEdges.BOTTOM
+            | WindowEdges.LEFT
+            | WindowEdges.RIGHT
+        )
+        # Convert 8-bit color values (0-255) to 32-bit (0-0xFFFFFFFF)
+        # River protocol expects 32-bit RGBA values
+        def to_32bit(val: int) -> int:
+            return (val * 0xFFFFFFFF) // 255
+
         return BorderConfig(
             edges=edges,
             width=self.config.border_width,
-            r=color[0],
-            g=color[1],
-            b=color[2],
-            a=color[3],
+            r=to_32bit(color[0]),
+            g=to_32bit(color[1]),
+            b=to_32bit(color[2]),
+            a=to_32bit(color[3]),
         )
 
     def _setup_key_bindings(self, seat: Seat):
@@ -754,48 +796,8 @@ class RiverWM:
 
 def main():
     """Main entry point."""
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        description="River Window Manager - A Python-based tiling window manager for River"
-    )
-    parser.add_argument(
-        "--terminal",
-        "-t",
-        default="foot",
-        help="Terminal emulator command (default: foot)",
-    )
-    parser.add_argument(
-        "--launcher",
-        "-l",
-        default="fuzzel",
-        help="Application launcher command (default: fuzzel)",
-    )
-    parser.add_argument(
-        "--gap",
-        "-g",
-        type=int,
-        default=4,
-        help="Gap between windows in pixels (default: 4)",
-    )
-    parser.add_argument(
-        "--border-width",
-        "-b",
-        type=int,
-        default=2,
-        help="Border width in pixels (default: 2)",
-    )
-
-    args = parser.parse_args()
-
-    config = RiverConfig(
-        terminal=args.terminal,
-        launcher=args.launcher,
-        gap=args.gap,
-        border_width=args.border_width,
-    )
-
-    wm = RiverWM(config)
+    config = RiverConfig()
+    wm = PWM(config)
     return wm.run()
 
 

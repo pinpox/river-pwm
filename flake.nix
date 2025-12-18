@@ -146,8 +146,14 @@
             };
           });
 
+          # Helper script to start river + pwm. When used inside a running
+          # compositor, it will lauch in a window - useful for testing and
+          # debugging
           river-pwm = pkgs.writeShellScriptBin "river-pwm" ''
             set -e
+
+            export PWM_TERMINAL="${pkgs.foot}/bin/foot"
+            export PWM_LAUNCHER="${pkgs.fuzzel}/bin/fuzzel"
 
             # Detect if running in nested mode (inside another compositor)
             if [ -n "$WAYLAND_DISPLAY" ] || [ -n "$DISPLAY" ]; then
