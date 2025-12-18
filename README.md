@@ -192,12 +192,14 @@ This implementation uses the following River protocols:
 
 The project uses Nix flakes for reproducible builds. The flake provides:
 
-- `packages.pwm`: The window manager package
-- `packages.river`: River compositor 0.4.x
-- `packages.river-pwm`: Script to launch River + pwm
-- `packages.river-pwm-nested`: Script to run in nested mode
+- `packages.pwm`: The pwm window manager package
+- `packages.river`: River compositor 0.4.x (from upstream)
+- `packages.river-pwm`: Script to launch River + pwm together
+- `packages.river-pwm-nested`: Script to run in nested mode for testing
 - `apps.nested`: Run in a window (default)
 - `apps.river-pwm`: Run on bare metal
+
+Note: The flake includes River 0.4.x for convenience, but River is developed separately by the River project.
 
 ## License
 
@@ -205,4 +207,6 @@ ISC License (same as River).
 
 ## Credits
 
-Built for the River Wayland compositor by pinpox.
+**pwm** is created by pinpox as a window manager for the [River Wayland compositor](https://github.com/riverwm/river).
+
+River itself is developed by Isaac Freund and the River contributors.
