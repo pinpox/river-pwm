@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Check flake
+        run: nix flake check --all-systems --show-trace
+
+      - name: Build pwm-lib
+        run: nix build .#pwm-lib
+
+      - name: Build pwm
+        run: nix build .#pwm
+
+      - name: Build river
+        run: nix build .#river
+
+      - name: Build river-pwm
+        run: nix build .#river-pwm
+
+      - name: Check formatting
+        run: nix build .#checks.x86_64-linux.formatting
