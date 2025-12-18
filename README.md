@@ -22,52 +22,16 @@ A tiling window manager for the River Wayland compositor, written in Python.
 ### With Nix Flakes
 
 ```bash
-# Run nested in a window (for testing)
-nix run github:pinpox/river-pwm#nested
-
-# Run on bare metal (launches River + pwm)
-nix run github:pinpox/river-pwm#river-pwm
+# Run river-pwm (auto-detects nested or bare-metal mode)
+nix run github:pinpox/river-pwm
 
 # Install to your system
 nix profile install github:pinpox/river-pwm
 ```
 
-### From Source
-
-```bash
-# Clone the repository
-git clone https://github.com/pinpox/river-pwm
-cd river-pwm
-
-# Run in nested mode for testing
-nix run .#nested
-
-# Build the package
-nix build .#pwm
-```
-
-## Usage
-
-### Running Nested (in a window)
-
-Perfect for testing without leaving your current desktop:
-
-```bash
-nix run .#nested
-```
-
-This will open River in a window with pwm managing windows inside it.
-
-### Running on Bare Metal
-
-To use as your actual window manager:
-
-```bash
-# From your display manager or .xinitrc
-nix run github:pinpox/river-pwm#river-pwm
-```
-
-Or install and add to your display manager sessions.
+The script automatically detects if you're running inside another compositor:
+- **Nested mode** (if `WAYLAND_DISPLAY` or `DISPLAY` is set): Opens River in a window
+- **Bare metal** (if not set): Starts River as the main compositor
 
 ### Command Line Options
 
@@ -81,7 +45,7 @@ Options:
   --border-width, -b INTEGER Border width in pixels (default: 2)
 ```
 
-## Key Bindings
+## Default Key Bindings
 
 All bindings use **Alt** as the modifier key.
 
@@ -192,12 +156,9 @@ This implementation uses the following River protocols:
 
 The project uses Nix flakes for reproducible builds. The flake provides:
 
-- `packages.pwm`: The pwm window manager package
+- `packages.pwm`: The pwm window manager binary
 - `packages.river`: River compositor 0.4.x (from upstream)
-- `packages.river-pwm`: Script to launch River + pwm together
-- `packages.river-pwm-nested`: Script to run in nested mode for testing
-- `apps.nested`: Run in a window (default)
-- `apps.river-pwm`: Run on bare metal
+- `packages.river-pwm`: Smart launcher script (auto-detects nested/bare-metal mode)
 
 Note: The flake includes River 0.4.x for convenience, but River is developed separately by the River project.
 
