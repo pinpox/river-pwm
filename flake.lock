@@ -18,10 +18,12 @@
     "river-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1766070307,
-        "narHash": "sha256-yMBcSMWwO6S7nTUQpiOW64OHVgSJzGr6e3ZMKtPqo4A=",
-        "path": "/home/pinpox/code/codeberg.org/river/river",
-        "type": "path"
+        "lastModified": 1765800115,
+        "narHash": "sha256-MeMjk0i773nYzDSwhKBMEpfEt+8Pqgy4Z+b+YM+c8s0=",
+        "owner": "riverwm",
+        "repo": "river",
+        "rev": "673f8772479b2adf6eb1d812cb54d7623d800dc1",
+        "type": "github"
       },
       "original": {
         "owner": "riverwm",
