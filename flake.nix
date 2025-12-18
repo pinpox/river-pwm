@@ -7,7 +7,11 @@
   inputs.river-src.flake = false;
 
   outputs =
-    { self, nixpkgs, river-src }:
+    {
+      self,
+      nixpkgs,
+      river-src,
+    }:
     let
 
       # to work with older version of flakes
@@ -39,8 +43,7 @@
             version = "0.1.0";
             src = ./.;
 
-            pyproject = true;
-            build-system = [ pkgs.python3Packages.setuptools ];
+            format = "setuptools";
 
             meta = {
               description = "Python library for River window management protocol";
@@ -50,12 +53,13 @@
           };
 
           # Executable with example configuration
-          pwm = pkgs.writers.writePython3Bin "pwm"
-            {
-              libraries = [ self.packages.${system}.pwm-lib ];
-              flakeIgnore = [ "E265" "E501" ];
-            }
-            (builtins.readFile ./pwm.py);
+          pwm = pkgs.writers.writePython3Bin "pwm" {
+            libraries = [ self.packages.${system}.pwm-lib ];
+            flakeIgnore = [
+              "E265"
+              "E501"
+            ];
+          } (builtins.readFile ./pwm.py);
 
           river = pkgs.stdenv.mkDerivation (finalAttrs: {
             pname = "river";

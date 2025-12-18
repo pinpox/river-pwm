@@ -1,0 +1,21 @@
+Metadata-Version: 2.4
+Name: pwm
+Version: 0.1.0
+Summary: pinpox' window manager - A Python library for River window management
+Author: pinpox
+License: ISC
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: End Users/Desktop
+Classifier: License :: OSI Approved :: ISC License (ISCL)
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Topic :: Desktop Environment :: Window Managers
+Requires-Python: >=3.8
+Dynamic: author
+Dynamic: classifier
+Dynamic: license
+Dynamic: requires-python
+Dynamic: summary
