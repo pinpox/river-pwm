@@ -25,8 +25,8 @@ Or run directly:
     python -m pwm
 """
 
-__version__ = '0.1.0'
-__author__ = 'pinpox'
+__version__ = "0.1.0"
+__author__ = "pinpox"
 
 from .protocol import (
     DecorationHint,
@@ -77,51 +77,45 @@ from .riverwm import (
 
 __all__ = [
     # Version
-    '__version__',
-
+    "__version__",
     # Protocol types
-    'DecorationHint',
-    'WindowEdges',
-    'WindowCapabilities',
-    'Modifiers',
-    'DimensionHint',
-    'Position',
-    'Dimensions',
-    'Area',
-    'BorderConfig',
-
+    "DecorationHint",
+    "WindowEdges",
+    "WindowCapabilities",
+    "Modifiers",
+    "DimensionHint",
+    "Position",
+    "Dimensions",
+    "Area",
+    "BorderConfig",
     # Connection
-    'WaylandConnection',
-
+    "WaylandConnection",
     # Objects
-    'Window',
-    'Node',
-    'Output',
-    'Seat',
-    'PointerBinding',
-    'XkbBinding',
-    'LayerShellOutput',
-    'LayerShellSeat',
-
+    "Window",
+    "Node",
+    "Output",
+    "Seat",
+    "PointerBinding",
+    "XkbBinding",
+    "LayerShellOutput",
+    "LayerShellSeat",
     # Manager
-    'WindowManager',
-    'ManagerState',
-
+    "WindowManager",
+    "ManagerState",
     # Layouts
-    'Layout',
-    'LayoutGeometry',
-    'LayoutDirection',
-    'TilingLayout',
-    'MonocleLayout',
-    'GridLayout',
-    'FloatingLayout',
-    'CenteredMasterLayout',
-    'Workspace',
-    'LayoutManager',
-
+    "Layout",
+    "LayoutGeometry",
+    "LayoutDirection",
+    "TilingLayout",
+    "MonocleLayout",
+    "GridLayout",
+    "FloatingLayout",
+    "CenteredMasterLayout",
+    "Workspace",
+    "LayoutManager",
     # Window Manager
-    'RiverWM',
-    'RiverConfig',
-    'XKB',
-    'BTN',
+    "RiverWM",
+    "RiverConfig",
+    "XKB",
+    "BTN",
 ]

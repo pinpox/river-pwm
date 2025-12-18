@@ -14,60 +14,89 @@ from enum import Enum, auto
 from .manager import WindowManager, ManagerState
 from .objects import Window, Output, Seat, XkbBinding, PointerBinding
 from .layout import (
-    LayoutManager, LayoutGeometry, TilingLayout, MonocleLayout,
-    GridLayout, FloatingLayout, CenteredMasterLayout, LayoutDirection
+    LayoutManager,
+    LayoutGeometry,
+    TilingLayout,
+    MonocleLayout,
+    GridLayout,
+    FloatingLayout,
+    CenteredMasterLayout,
+    LayoutDirection,
 )
-from .protocol import (
-    Modifiers, WindowEdges, WindowCapabilities, BorderConfig
-)
+from .protocol import Modifiers, WindowEdges, WindowCapabilities, BorderConfig
+
 
 # XKB keysym values (from xkbcommon-keysyms.h)
 class XKB:
     """Common XKB keysym constants."""
+
     # Letters
-    a, b, c, d, e, f, g, h, i, j = 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a
-    k, l, m, n, o, p, q, r, s, t = 0x6b, 0x6c, 0x6d, 0x6e, 0x6f, 0x70, 0x71, 0x72, 0x73, 0x74
-    u, v, w, x, y, z = 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a
+    a, b, c, d, e, f, g, h, i, j = (
+        0x61,
+        0x62,
+        0x63,
+        0x64,
+        0x65,
+        0x66,
+        0x67,
+        0x68,
+        0x69,
+        0x6A,
+    )
+    k, l, m, n, o, p, q, r, s, t = (
+        0x6B,
+        0x6C,
+        0x6D,
+        0x6E,
+        0x6F,
+        0x70,
+        0x71,
+        0x72,
+        0x73,
+        0x74,
+    )
+    u, v, w, x, y, z = 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A
 
     # Numbers
     _1, _2, _3, _4, _5 = 0x31, 0x32, 0x33, 0x34, 0x35
     _6, _7, _8, _9, _0 = 0x36, 0x37, 0x38, 0x39, 0x30
 
     # Function keys
-    F1, F2, F3, F4, F5, F6 = 0xffbe, 0xffbf, 0xffc0, 0xffc1, 0xffc2, 0xffc3
-    F7, F8, F9, F10, F11, F12 = 0xffc4, 0xffc5, 0xffc6, 0xffc7, 0xffc8, 0xffc9
+    F1, F2, F3, F4, F5, F6 = 0xFFBE, 0xFFBF, 0xFFC0, 0xFFC1, 0xFFC2, 0xFFC3
+    F7, F8, F9, F10, F11, F12 = 0xFFC4, 0xFFC5, 0xFFC6, 0xFFC7, 0xFFC8, 0xFFC9
 
     # Special keys
-    Return = 0xff0d
-    Escape = 0xff1b
-    Tab = 0xff09
-    BackSpace = 0xff08
+    Return = 0xFF0D
+    Escape = 0xFF1B
+    Tab = 0xFF09
+    BackSpace = 0xFF08
     space = 0x20
 
     # Navigation
-    Left = 0xff51
-    Up = 0xff52
-    Right = 0xff53
-    Down = 0xff54
-    Home = 0xff50
-    End = 0xff57
-    Page_Up = 0xff55
-    Page_Down = 0xff56
+    Left = 0xFF51
+    Up = 0xFF52
+    Right = 0xFF53
+    Down = 0xFF54
+    Home = 0xFF50
+    End = 0xFF57
+    Page_Up = 0xFF55
+    Page_Down = 0xFF56
 
     # Modifiers
-    Shift_L = 0xffe1
-    Shift_R = 0xffe2
-    Control_L = 0xffe3
-    Control_R = 0xffe4
-    Alt_L = 0xffe9
-    Alt_R = 0xffea
-    Super_L = 0xffeb
-    Super_R = 0xffec
+    Shift_L = 0xFFE1
+    Shift_R = 0xFFE2
+    Control_L = 0xFFE3
+    Control_R = 0xFFE4
+    Alt_L = 0xFFE9
+    Alt_R = 0xFFEA
+    Super_L = 0xFFEB
+    Super_R = 0xFFEC
 
 
 # Linux input event codes (from linux/input-event-codes.h)
 class BTN:
     """Mouse button codes."""
+
     LEFT = 0x110
     RIGHT = 0x111
     MIDDLE = 0x112
@@ -83,8 +112,8 @@ class RiverConfig:
     # Layout settings
     gap: int = 4
     border_width: int = 2
-    border_color: Tuple[int, int, int, int] = (0x4c, 0x4c, 0x4c, 0xFF)
-    focused_border_color: Tuple[int, int, int, int] = (0x52, 0x94, 0xe2, 0xFF)
+    border_color: Tuple[int, int, int, int] = (0x4C, 0x4C, 0x4C, 0xFF)
+    focused_border_color: Tuple[int, int, int, int] = (0x52, 0x94, 0xE2, 0xFF)
 
     # Programs
     terminal: str = "foot"
@@ -99,6 +128,7 @@ class RiverConfig:
 
 class OpType(Enum):
     """Interactive operation types."""
+
     NONE = auto()
     MOVE = auto()
     RESIZE = auto()
@@ -159,10 +189,10 @@ class RiverWM:
 
         # Set capabilities
         window.set_capabilities(
-            WindowCapabilities.WINDOW_MENU |
-            WindowCapabilities.MAXIMIZE |
-            WindowCapabilities.FULLSCREEN |
-            WindowCapabilities.MINIMIZE
+            WindowCapabilities.WINDOW_MENU
+            | WindowCapabilities.MAXIMIZE
+            | WindowCapabilities.FULLSCREEN
+            | WindowCapabilities.MINIMIZE
         )
 
         # Handle window requests
@@ -177,7 +207,9 @@ class RiverWM:
             self.focused_window = None
             # Try to focus another window
             if self.focused_output:
-                workspace = self.layout_manager.get_active_workspace(self.focused_output)
+                workspace = self.layout_manager.get_active_workspace(
+                    self.focused_output
+                )
                 if workspace and workspace.focused_window:
                     self.focused_window = workspace.focused_window
 
@@ -414,7 +446,11 @@ class RiverWM:
                 workspace.focused_window = self.focused_window
 
         # Propose dimensions for all windows
-        if self.focused_output and self.focused_output.width > 0 and self.focused_output.height > 0:
+        if (
+            self.focused_output
+            and self.focused_output.width > 0
+            and self.focused_output.height > 0
+        ):
             geometries = self.layout_manager.calculate_layout(self.focused_output)
             for window, geom in geometries.items():
                 # Ensure dimensions are positive
@@ -447,15 +483,17 @@ class RiverWM:
 
                 # Set borders
                 if window == self.focused_window:
-                    window.set_borders(self._make_border_config(
-                        geom.tiled_edges,
-                        self.config.focused_border_color
-                    ))
+                    window.set_borders(
+                        self._make_border_config(
+                            geom.tiled_edges, self.config.focused_border_color
+                        )
+                    )
                 else:
-                    window.set_borders(self._make_border_config(
-                        geom.tiled_edges,
-                        self.config.border_color
-                    ))
+                    window.set_borders(
+                        self._make_border_config(
+                            geom.tiled_edges, self.config.border_color
+                        )
+                    )
 
                 # Show window
                 window.show()
@@ -471,17 +509,24 @@ class RiverWM:
         # Finish render sequence
         self.manager.render_finish()
 
-    def _make_border_config(self, edges: WindowEdges, color: Tuple[int, int, int, int]) -> BorderConfig:
+    def _make_border_config(
+        self, edges: WindowEdges, color: Tuple[int, int, int, int]
+    ) -> BorderConfig:
         """Create a border configuration."""
         if edges == WindowEdges.NONE:
-            edges = WindowEdges.TOP | WindowEdges.BOTTOM | WindowEdges.LEFT | WindowEdges.RIGHT
+            edges = (
+                WindowEdges.TOP
+                | WindowEdges.BOTTOM
+                | WindowEdges.LEFT
+                | WindowEdges.RIGHT
+            )
         return BorderConfig(
             edges=edges,
             width=self.config.border_width,
             r=color[0],
             g=color[1],
             b=color[2],
-            a=color[3]
+            a=color[3],
         )
 
     def _setup_key_bindings(self, seat: Seat):
@@ -515,20 +560,30 @@ class RiverWM:
 
         # Cycle layouts
         self._bind_key(seat, XKB.space, mod, self._cycle_layout)
-        self._bind_key(seat, XKB.space, mod | Modifiers.SHIFT, self._cycle_layout_reverse)
+        self._bind_key(
+            seat, XKB.space, mod | Modifiers.SHIFT, self._cycle_layout_reverse
+        )
 
         # Toggle fullscreen: Mod+F
         self._bind_key(seat, XKB.f, mod, self._toggle_fullscreen)
 
         # Workspace bindings: Mod+1-9
         for i in range(1, self.config.num_workspaces + 1):
-            keysym = getattr(XKB, f'_{i}')
+            keysym = getattr(XKB, f"_{i}")
             ws_id = i
-            self._bind_key(seat, keysym, mod, lambda ws=ws_id: self._switch_workspace(ws))
-            self._bind_key(seat, keysym, mod | Modifiers.SHIFT,
-                          lambda ws=ws_id: self._move_to_workspace(ws))
+            self._bind_key(
+                seat, keysym, mod, lambda ws=ws_id: self._switch_workspace(ws)
+            )
+            self._bind_key(
+                seat,
+                keysym,
+                mod | Modifiers.SHIFT,
+                lambda ws=ws_id: self._move_to_workspace(ws),
+            )
 
-    def _bind_key(self, seat: Seat, keysym: int, modifiers: Modifiers, action: Callable):
+    def _bind_key(
+        self, seat: Seat, keysym: int, modifiers: Modifiers, action: Callable
+    ):
         """Create and enable a key binding."""
         binding = self.manager.get_xkb_binding(seat, keysym, modifiers)
         binding.on_pressed = action
@@ -557,8 +612,9 @@ class RiverWM:
         """Handle resize binding pressed."""
         if seat.pointer_window:
             # Default to bottom-right resize
-            self._start_resize(seat, seat.pointer_window,
-                             WindowEdges.RIGHT | WindowEdges.BOTTOM)
+            self._start_resize(
+                seat, seat.pointer_window, WindowEdges.RIGHT | WindowEdges.BOTTOM
+            )
 
     # Actions
 
@@ -579,7 +635,7 @@ class RiverWM:
                 shell=True,
                 start_new_session=True,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stderr=subprocess.DEVNULL,
             )
         except Exception as e:
             print(f"Failed to spawn {command}: {e}")
@@ -642,6 +698,7 @@ class RiverWM:
         """Toggle fullscreen for the focused window."""
         if self.focused_window and self.focused_output:
             from .objects import WindowState
+
             if self.focused_window.state == WindowState.FULLSCREEN:
                 self.focused_window.exit_fullscreen()
                 self.focused_window.inform_not_fullscreen()
@@ -662,10 +719,14 @@ class RiverWM:
     def _move_to_workspace(self, workspace_id: int):
         """Move focused window to a workspace."""
         if self.focused_window:
-            self.layout_manager.move_window_to_workspace(self.focused_window, workspace_id)
+            self.layout_manager.move_window_to_workspace(
+                self.focused_window, workspace_id
+            )
             # Focus another window in current workspace
             if self.focused_output:
-                workspace = self.layout_manager.get_active_workspace(self.focused_output)
+                workspace = self.layout_manager.get_active_workspace(
+                    self.focused_output
+                )
                 if workspace:
                     self.focused_window = workspace.focused_window
             self.manager.manage_dirty()
@@ -696,16 +757,34 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description='River Window Manager - A Python-based tiling window manager for River'
+        description="River Window Manager - A Python-based tiling window manager for River"
     )
-    parser.add_argument('--terminal', '-t', default='foot',
-                       help='Terminal emulator command (default: foot)')
-    parser.add_argument('--launcher', '-l', default='fuzzel',
-                       help='Application launcher command (default: fuzzel)')
-    parser.add_argument('--gap', '-g', type=int, default=4,
-                       help='Gap between windows in pixels (default: 4)')
-    parser.add_argument('--border-width', '-b', type=int, default=2,
-                       help='Border width in pixels (default: 2)')
+    parser.add_argument(
+        "--terminal",
+        "-t",
+        default="foot",
+        help="Terminal emulator command (default: foot)",
+    )
+    parser.add_argument(
+        "--launcher",
+        "-l",
+        default="fuzzel",
+        help="Application launcher command (default: fuzzel)",
+    )
+    parser.add_argument(
+        "--gap",
+        "-g",
+        type=int,
+        default=4,
+        help="Gap between windows in pixels (default: 4)",
+    )
+    parser.add_argument(
+        "--border-width",
+        "-b",
+        type=int,
+        default=2,
+        help="Border width in pixels (default: 2)",
+    )
 
     args = parser.parse_args()
 
@@ -720,6 +799,7 @@ def main():
     return wm.run()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
+
     sys.exit(main())

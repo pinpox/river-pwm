@@ -13,18 +13,33 @@ import signal
 
 from .connection import WaylandConnection, GlobalInfo
 from .protocol import (
-    MessageEncoder, MessageDecoder, WaylandMessage, ProtocolObject,
-    RiverWindowManagerV1, RiverWindowV1, RiverOutputV1, RiverSeatV1,
-    RiverXkbBindingsV1, RiverLayerShellV1, Modifiers,
+    MessageEncoder,
+    MessageDecoder,
+    WaylandMessage,
+    ProtocolObject,
+    RiverWindowManagerV1,
+    RiverWindowV1,
+    RiverOutputV1,
+    RiverSeatV1,
+    RiverXkbBindingsV1,
+    RiverLayerShellV1,
+    Modifiers,
 )
 from .objects import (
-    Window, Node, Output, Seat, PointerBinding, XkbBinding,
-    LayerShellOutput, LayerShellSeat,
+    Window,
+    Node,
+    Output,
+    Seat,
+    PointerBinding,
+    XkbBinding,
+    LayerShellOutput,
+    LayerShellSeat,
 )
 
 
 class ManagerState(Enum):
     """Window manager state machine states."""
+
     IDLE = auto()
     MANAGE = auto()
     RENDER = auto()
@@ -78,7 +93,7 @@ class WindowManager:
 
         # Get registry and wait for globals
         self.connection.get_registry()
-        self.connection.on_event('wl_registry', 'global', self._on_global)
+        self.connection.on_event("wl_registry", "global", self._on_global)
 
         if not self.connection.roundtrip():
             return False
@@ -92,7 +107,7 @@ class WindowManager:
         self.wm_id = self.connection.bind_global(
             wm_global.name,
             RiverWindowManagerV1.INTERFACE,
-            min(wm_global.version, RiverWindowManagerV1.VERSION)
+            min(wm_global.version, RiverWindowManagerV1.VERSION),
         )
 
         # Register the wm object so events are dispatched to it
@@ -106,7 +121,7 @@ class WindowManager:
             self.xkb_bindings_id = self.connection.bind_global(
                 xkb_global.name,
                 RiverXkbBindingsV1.INTERFACE,
-                min(xkb_global.version, RiverXkbBindingsV1.VERSION)
+                min(xkb_global.version, RiverXkbBindingsV1.VERSION),
             )
 
         # Bind to river_layer_shell_v1 if available
@@ -115,12 +130,14 @@ class WindowManager:
             self.layer_shell_id = self.connection.bind_global(
                 layer_shell_global.name,
                 RiverLayerShellV1.INTERFACE,
-                min(layer_shell_global.version, RiverLayerShellV1.VERSION)
+                min(layer_shell_global.version, RiverLayerShellV1.VERSION),
             )
 
         # Set up event handling - register handlers for each event type
         for opcode in range(9):  # Events 0-8
-            self.connection.on_event(RiverWindowManagerV1.INTERFACE, opcode, self._dispatch_wm_event)
+            self.connection.on_event(
+                RiverWindowManagerV1.INTERFACE, opcode, self._dispatch_wm_event
+            )
 
         # Roundtrip to get initial state
         if not self.connection.roundtrip():
@@ -139,7 +156,7 @@ class WindowManager:
         """Handle new global advertisement."""
         pass  # We handle globals in connect()
 
-    def send_request(self, object_id: int, opcode: int, payload: bytes = b''):
+    def send_request(self, object_id: int, opcode: int, payload: bytes = b""):
         """Send a request to the compositor."""
         self.connection.send_message(object_id, opcode, payload)
 
@@ -168,6 +185,7 @@ class WindowManager:
         except Exception as e:
             print(f"[DEBUG] Error creating decoder: {e}")
             import traceback
+
             traceback.print_exc()
             return
 
@@ -263,7 +281,9 @@ class WindowManager:
         ls_output = LayerShellOutput(obj_id, self, output)
         self.connection.register_object(ls_output)
         payload = MessageEncoder().new_id(obj_id).object(output).bytes()
-        self.send_request(self.layer_shell_id, RiverLayerShellV1.Request.GET_OUTPUT, payload)
+        self.send_request(
+            self.layer_shell_id, RiverLayerShellV1.Request.GET_OUTPUT, payload
+        )
 
     def _create_layer_shell_seat(self, seat: Seat):
         """Create layer shell seat object."""
@@ -271,9 +291,13 @@ class WindowManager:
         ls_seat = LayerShellSeat(obj_id, self, seat)
         self.connection.register_object(ls_seat)
         payload = MessageEncoder().new_id(obj_id).object(seat).bytes()
-        self.send_request(self.layer_shell_id, RiverLayerShellV1.Request.GET_SEAT, payload)
+        self.send_request(
+            self.layer_shell_id, RiverLayerShellV1.Request.GET_SEAT, payload
+        )
 
-    def get_xkb_binding(self, seat: Seat, keysym: int, modifiers: Modifiers) -> XkbBinding:
+    def get_xkb_binding(
+        self, seat: Seat, keysym: int, modifiers: Modifiers
+    ) -> XkbBinding:
         """Create an XKB key binding."""
         if not self.xkb_bindings_id:
             raise RuntimeError("XKB bindings not available")
@@ -283,13 +307,17 @@ class WindowManager:
         seat.xkb_bindings[binding_id] = binding
         self.connection.register_object(binding)
 
-        payload = (MessageEncoder()
-                   .object(seat)
-                   .new_id(binding_id)
-                   .uint32(keysym)
-                   .uint32(modifiers.value)
-                   .bytes())
-        self.send_request(self.xkb_bindings_id, RiverXkbBindingsV1.Request.GET_XKB_BINDING, payload)
+        payload = (
+            MessageEncoder()
+            .object(seat)
+            .new_id(binding_id)
+            .uint32(keysym)
+            .uint32(modifiers.value)
+            .bytes()
+        )
+        self.send_request(
+            self.xkb_bindings_id, RiverXkbBindingsV1.Request.GET_XKB_BINDING, payload
+        )
         return binding
 
     def _process_pending_events(self):
@@ -302,7 +330,7 @@ class WindowManager:
     def _dispatch_object_event(self, msg: WaylandMessage):
         """Dispatch an event to the appropriate object."""
         obj = self.connection.get_object(msg.object_id)
-        if obj and hasattr(obj, 'handle_event'):
+        if obj and hasattr(obj, "handle_event"):
             obj.handle_event(msg)
 
     def _dispatch_wm_event(self, msg: WaylandMessage):
@@ -337,7 +365,9 @@ class WindowManager:
         # Process events in receive buffer
         while len(self.connection.recv_buffer) >= 8:
             try:
-                msg, remaining = WaylandMessage.decode(bytes(self.connection.recv_buffer))
+                msg, remaining = WaylandMessage.decode(
+                    bytes(self.connection.recv_buffer)
+                )
                 self.connection.recv_buffer = bytearray(remaining)
 
                 # Route to appropriate handler

@@ -14,6 +14,7 @@ import struct
 
 class DecorationHint(IntEnum):
     """Window decoration hint."""
+
     ONLY_SUPPORTS_CSD = 0
     PREFERS_CSD = 1
     PREFERS_SSD = 2
@@ -22,6 +23,7 @@ class DecorationHint(IntEnum):
 
 class WindowEdges(IntFlag):
     """Window edge flags."""
+
     NONE = 0
     TOP = 1
     BOTTOM = 2
@@ -31,6 +33,7 @@ class WindowEdges(IntFlag):
 
 class WindowCapabilities(IntFlag):
     """Window capabilities."""
+
     WINDOW_MENU = 1
     MAXIMIZE = 2
     FULLSCREEN = 4
@@ -39,6 +42,7 @@ class WindowCapabilities(IntFlag):
 
 class Modifiers(IntFlag):
     """Keyboard modifiers."""
+
     NONE = 0
     SHIFT = 1
     CTRL = 4
@@ -51,6 +55,7 @@ class Modifiers(IntFlag):
 @dataclass
 class DimensionHint:
     """Window dimension hints."""
+
     min_width: int = 0
     min_height: int = 0
     max_width: int = 0
@@ -60,6 +65,7 @@ class DimensionHint:
 @dataclass
 class Position:
     """Position in logical coordinate space."""
+
     x: int = 0
     y: int = 0
 
@@ -67,6 +73,7 @@ class Position:
 @dataclass
 class Dimensions:
     """Dimensions in logical coordinate space."""
+
     width: int = 0
     height: int = 0
 
@@ -74,6 +81,7 @@ class Dimensions:
 @dataclass
 class Area:
     """Area with position and dimensions."""
+
     x: int = 0
     y: int = 0
     width: int = 0
@@ -83,6 +91,7 @@ class Area:
 @dataclass
 class BorderConfig:
     """Window border configuration."""
+
     edges: WindowEdges = WindowEdges.NONE
     width: int = 0
     r: int = 0
@@ -112,7 +121,7 @@ class ProtocolObject:
 class WaylandMessage:
     """Represents a Wayland wire protocol message."""
 
-    def __init__(self, object_id: int, opcode: int, payload: bytes = b''):
+    def __init__(self, object_id: int, opcode: int, payload: bytes = b""):
         self.object_id = object_id
         self.opcode = opcode
         self.payload = payload
@@ -122,19 +131,21 @@ class WaylandMessage:
         size = 8 + len(self.payload)
         # Pad to 32-bit boundary
         padding = (4 - (size % 4)) % 4
-        header = struct.pack('<II', self.object_id, (size << 16) | self.opcode)
-        return header + self.payload + (b'\x00' * padding)
+        header = struct.pack("<II", self.object_id, (size << 16) | self.opcode)
+        return header + self.payload + (b"\x00" * padding)
 
     @classmethod
-    def decode(cls, data: bytes) -> tuple['WaylandMessage', bytes]:
+    def decode(cls, data: bytes) -> tuple["WaylandMessage", bytes]:
         """Decode message from wire format."""
         if len(data) < 8:
             raise ValueError("Not enough data for header")
-        object_id, size_opcode = struct.unpack('<II', data[:8])
+        object_id, size_opcode = struct.unpack("<II", data[:8])
         size = size_opcode >> 16
         opcode = size_opcode & 0xFFFF
         if len(data) < size:
-            raise ValueError(f"Not enough data for message: need {size}, have {len(data)}")
+            raise ValueError(
+                f"Not enough data for message: need {size}, have {len(data)}"
+            )
         payload = data[8:size]
         # Round up to 32-bit boundary
         consumed = size + ((4 - (size % 4)) % 4)
@@ -147,30 +158,30 @@ class MessageEncoder:
     def __init__(self):
         self.data = bytearray()
 
-    def int32(self, value: int) -> 'MessageEncoder':
-        self.data.extend(struct.pack('<i', value))
+    def int32(self, value: int) -> "MessageEncoder":
+        self.data.extend(struct.pack("<i", value))
         return self
 
-    def uint32(self, value: int) -> 'MessageEncoder':
-        self.data.extend(struct.pack('<I', value))
+    def uint32(self, value: int) -> "MessageEncoder":
+        self.data.extend(struct.pack("<I", value))
         return self
 
-    def new_id(self, value: int) -> 'MessageEncoder':
+    def new_id(self, value: int) -> "MessageEncoder":
         return self.uint32(value)
 
-    def object(self, obj: Optional[ProtocolObject]) -> 'MessageEncoder':
+    def object(self, obj: Optional[ProtocolObject]) -> "MessageEncoder":
         return self.uint32(obj.object_id if obj else 0)
 
-    def string(self, value: Optional[str]) -> 'MessageEncoder':
+    def string(self, value: Optional[str]) -> "MessageEncoder":
         if value is None:
             self.uint32(0)
         else:
-            encoded = value.encode('utf-8') + b'\x00'
+            encoded = value.encode("utf-8") + b"\x00"
             self.uint32(len(encoded))
             self.data.extend(encoded)
             # Pad to 32-bit boundary
             padding = (4 - (len(encoded) % 4)) % 4
-            self.data.extend(b'\x00' * padding)
+            self.data.extend(b"\x00" * padding)
         return self
 
     def bytes(self) -> bytes:
@@ -185,12 +196,12 @@ class MessageDecoder:
         self.offset = 0
 
     def int32(self) -> int:
-        value = struct.unpack_from('<i', self.data, self.offset)[0]
+        value = struct.unpack_from("<i", self.data, self.offset)[0]
         self.offset += 4
         return value
 
     def uint32(self) -> int:
-        value = struct.unpack_from('<I', self.data, self.offset)[0]
+        value = struct.unpack_from("<I", self.data, self.offset)[0]
         self.offset += 4
         return value
 
@@ -205,7 +216,7 @@ class MessageDecoder:
         if length == 0:
             return None
         # Length includes null terminator
-        value = self.data[self.offset:self.offset + length - 1].decode('utf-8')
+        value = self.data[self.offset : self.offset + length - 1].decode("utf-8")
         self.offset += length
         # Skip padding
         padding = (4 - (length % 4)) % 4
@@ -216,6 +227,7 @@ class MessageDecoder:
 # Protocol interface names and opcodes
 class RiverWindowManagerV1:
     """river_window_manager_v1 interface."""
+
     INTERFACE = "river_window_manager_v1"
     VERSION = 1
 
@@ -243,6 +255,7 @@ class RiverWindowManagerV1:
 
 class RiverWindowV1:
     """river_window_v1 interface."""
+
     INTERFACE = "river_window_v1"
     VERSION = 1
 
@@ -289,6 +302,7 @@ class RiverWindowV1:
 
 class RiverNodeV1:
     """river_node_v1 interface."""
+
     INTERFACE = "river_node_v1"
     VERSION = 1
 
@@ -303,6 +317,7 @@ class RiverNodeV1:
 
 class RiverOutputV1:
     """river_output_v1 interface."""
+
     INTERFACE = "river_output_v1"
     VERSION = 1
 
@@ -318,6 +333,7 @@ class RiverOutputV1:
 
 class RiverSeatV1:
     """river_seat_v1 interface."""
+
     INTERFACE = "river_seat_v1"
     VERSION = 1
 
@@ -343,6 +359,7 @@ class RiverSeatV1:
 
 class RiverPointerBindingV1:
     """river_pointer_binding_v1 interface."""
+
     INTERFACE = "river_pointer_binding_v1"
     VERSION = 1
 
@@ -358,6 +375,7 @@ class RiverPointerBindingV1:
 
 class RiverXkbBindingsV1:
     """river_xkb_bindings_v1 interface."""
+
     INTERFACE = "river_xkb_bindings_v1"
     VERSION = 1
 
@@ -368,6 +386,7 @@ class RiverXkbBindingsV1:
 
 class RiverXkbBindingV1:
     """river_xkb_binding_v1 interface."""
+
     INTERFACE = "river_xkb_binding_v1"
     VERSION = 1
 
@@ -384,6 +403,7 @@ class RiverXkbBindingV1:
 
 class RiverLayerShellV1:
     """river_layer_shell_v1 interface."""
+
     INTERFACE = "river_layer_shell_v1"
     VERSION = 1
 
@@ -395,6 +415,7 @@ class RiverLayerShellV1:
 
 class RiverLayerShellOutputV1:
     """river_layer_shell_output_v1 interface."""
+
     INTERFACE = "river_layer_shell_output_v1"
     VERSION = 1
 
@@ -408,6 +429,7 @@ class RiverLayerShellOutputV1:
 
 class RiverLayerShellSeatV1:
     """river_layer_shell_seat_v1 interface."""
+
     INTERFACE = "river_layer_shell_seat_v1"
     VERSION = 1
 
@@ -422,6 +444,7 @@ class RiverLayerShellSeatV1:
 
 class RiverShellSurfaceV1:
     """river_shell_surface_v1 interface."""
+
     INTERFACE = "river_shell_surface_v1"
     VERSION = 1
 
@@ -433,6 +456,7 @@ class RiverShellSurfaceV1:
 
 class RiverDecorationV1:
     """river_decoration_v1 interface."""
+
     INTERFACE = "river_decoration_v1"
     VERSION = 1
 

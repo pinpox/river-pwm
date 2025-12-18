@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 @dataclass
 class LayoutGeometry:
     """Calculated geometry for a window in a layout."""
+
     x: int
     y: int
     width: int
@@ -28,15 +29,18 @@ class LayoutGeometry:
 
 class LayoutDirection(Enum):
     """Split direction for layouts."""
+
     HORIZONTAL = auto()  # Windows arranged left-to-right
-    VERTICAL = auto()    # Windows arranged top-to-bottom
+    VERTICAL = auto()  # Windows arranged top-to-bottom
 
 
 class Layout(ABC):
     """Abstract base class for window layouts."""
 
     @abstractmethod
-    def calculate(self, windows: List['Window'], area: Area) -> Dict['Window', LayoutGeometry]:
+    def calculate(
+        self, windows: List["Window"], area: Area
+    ) -> Dict["Window", LayoutGeometry]:
         """
         Calculate window positions and sizes.
 
@@ -63,11 +67,13 @@ class TilingLayout(Layout):
     One or more master windows on one side, remaining windows stacked on the other.
     """
 
-    def __init__(self,
-                 direction: LayoutDirection = LayoutDirection.HORIZONTAL,
-                 master_count: int = 1,
-                 master_ratio: float = 0.55,
-                 gap: int = 4):
+    def __init__(
+        self,
+        direction: LayoutDirection = LayoutDirection.HORIZONTAL,
+        master_count: int = 1,
+        master_ratio: float = 0.55,
+        gap: int = 4,
+    ):
         self.direction = direction
         self.master_count = master_count
         self.master_ratio = master_ratio
@@ -79,7 +85,9 @@ class TilingLayout(Layout):
             return "tile-right"
         return "tile-bottom"
 
-    def calculate(self, windows: List['Window'], area: Area) -> Dict['Window', LayoutGeometry]:
+    def calculate(
+        self, windows: List["Window"], area: Area
+    ) -> Dict["Window", LayoutGeometry]:
         if not windows:
             return {}
 
@@ -93,20 +101,28 @@ class TilingLayout(Layout):
             area.x + self.gap,
             area.y + self.gap,
             area.width - 2 * self.gap,
-            area.height - 2 * self.gap
+            area.height - 2 * self.gap,
         )
 
         if n == 1:
             # Single window takes all space
             result[windows[0]] = LayoutGeometry(
-                usable.x, usable.y, usable.width, usable.height,
-                WindowEdges.TOP | WindowEdges.BOTTOM | WindowEdges.LEFT | WindowEdges.RIGHT
+                usable.x,
+                usable.y,
+                usable.width,
+                usable.height,
+                WindowEdges.TOP
+                | WindowEdges.BOTTOM
+                | WindowEdges.LEFT
+                | WindowEdges.RIGHT,
             )
             return result
 
         # Calculate master and stack areas
         if self.direction == LayoutDirection.HORIZONTAL:
-            master_width = int(usable.width * self.master_ratio) if stack_n > 0 else usable.width
+            master_width = (
+                int(usable.width * self.master_ratio) if stack_n > 0 else usable.width
+            )
             stack_width = usable.width - master_width - self.gap if stack_n > 0 else 0
 
             # Layout master windows
@@ -142,8 +158,12 @@ class TilingLayout(Layout):
                     )
 
         else:  # VERTICAL
-            master_height = int(usable.height * self.master_ratio) if stack_n > 0 else usable.height
-            stack_height = usable.height - master_height - self.gap if stack_n > 0 else 0
+            master_height = (
+                int(usable.height * self.master_ratio) if stack_n > 0 else usable.height
+            )
+            stack_height = (
+                usable.height - master_height - self.gap if stack_n > 0 else 0
+            )
 
             # Layout master windows
             master_width = (usable.width - (master_n - 1) * self.gap) // master_n
@@ -194,7 +214,9 @@ class MonocleLayout(Layout):
     def name(self) -> str:
         return "monocle"
 
-    def calculate(self, windows: List['Window'], area: Area) -> Dict['Window', LayoutGeometry]:
+    def calculate(
+        self, windows: List["Window"], area: Area
+    ) -> Dict["Window", LayoutGeometry]:
         if not windows:
             return {}
 
@@ -205,14 +227,20 @@ class MonocleLayout(Layout):
             area.x + self.gap,
             area.y + self.gap,
             area.width - 2 * self.gap,
-            area.height - 2 * self.gap
+            area.height - 2 * self.gap,
         )
 
         # All windows get full size
         for win in windows:
             result[win] = LayoutGeometry(
-                usable.x, usable.y, usable.width, usable.height,
-                WindowEdges.TOP | WindowEdges.BOTTOM | WindowEdges.LEFT | WindowEdges.RIGHT
+                usable.x,
+                usable.y,
+                usable.width,
+                usable.height,
+                WindowEdges.TOP
+                | WindowEdges.BOTTOM
+                | WindowEdges.LEFT
+                | WindowEdges.RIGHT,
             )
 
         return result
@@ -230,7 +258,9 @@ class GridLayout(Layout):
     def name(self) -> str:
         return "grid"
 
-    def calculate(self, windows: List['Window'], area: Area) -> Dict['Window', LayoutGeometry]:
+    def calculate(
+        self, windows: List["Window"], area: Area
+    ) -> Dict["Window", LayoutGeometry]:
         if not windows:
             return {}
 
@@ -248,7 +278,7 @@ class GridLayout(Layout):
             area.x + self.gap,
             area.y + self.gap,
             area.width - 2 * self.gap,
-            area.height - 2 * self.gap
+            area.height - 2 * self.gap,
         )
 
         cell_width = (usable.width - (cols - 1) * self.gap) // cols
@@ -291,15 +321,17 @@ class FloatingLayout(Layout):
     def name(self) -> str:
         return "floating"
 
-    def set_position(self, window: 'Window', x: int, y: int):
+    def set_position(self, window: "Window", x: int, y: int):
         """Set window position."""
         self._positions[window.object_id] = (x, y)
 
-    def set_size(self, window: 'Window', width: int, height: int):
+    def set_size(self, window: "Window", width: int, height: int):
         """Set window size."""
         self._sizes[window.object_id] = (width, height)
 
-    def calculate(self, windows: List['Window'], area: Area) -> Dict['Window', LayoutGeometry]:
+    def calculate(
+        self, windows: List["Window"], area: Area
+    ) -> Dict["Window", LayoutGeometry]:
         if not windows:
             return {}
 
@@ -331,7 +363,7 @@ class FloatingLayout(Layout):
 
         return result
 
-    def remove_window(self, window: 'Window'):
+    def remove_window(self, window: "Window"):
         """Remove window from tracking."""
         self._positions.pop(window.object_id, None)
         self._sizes.pop(window.object_id, None)
@@ -344,10 +376,7 @@ class CenteredMasterLayout(Layout):
     Master window(s) centered, stack windows on both sides.
     """
 
-    def __init__(self,
-                 master_count: int = 1,
-                 master_ratio: float = 0.5,
-                 gap: int = 4):
+    def __init__(self, master_count: int = 1, master_ratio: float = 0.5, gap: int = 4):
         self.master_count = master_count
         self.master_ratio = master_ratio
         self.gap = gap
@@ -356,7 +385,9 @@ class CenteredMasterLayout(Layout):
     def name(self) -> str:
         return "centered-master"
 
-    def calculate(self, windows: List['Window'], area: Area) -> Dict['Window', LayoutGeometry]:
+    def calculate(
+        self, windows: List["Window"], area: Area
+    ) -> Dict["Window", LayoutGeometry]:
         if not windows:
             return {}
 
@@ -370,7 +401,7 @@ class CenteredMasterLayout(Layout):
             area.x + self.gap,
             area.y + self.gap,
             area.width - 2 * self.gap,
-            area.height - 2 * self.gap
+            area.height - 2 * self.gap,
         )
 
         if stack_n == 0:
@@ -382,8 +413,14 @@ class CenteredMasterLayout(Layout):
             for i, win in enumerate(windows):
                 y = usable.y + i * (master_height + self.gap)
                 result[win] = LayoutGeometry(
-                    master_x, y, master_width, master_height,
-                    WindowEdges.TOP | WindowEdges.BOTTOM | WindowEdges.LEFT | WindowEdges.RIGHT
+                    master_x,
+                    y,
+                    master_width,
+                    master_height,
+                    WindowEdges.TOP
+                    | WindowEdges.BOTTOM
+                    | WindowEdges.LEFT
+                    | WindowEdges.RIGHT,
                 )
         else:
             # Master in center, stack split on sides
@@ -396,8 +433,11 @@ class CenteredMasterLayout(Layout):
             for i, win in enumerate(windows[:master_n]):
                 y = usable.y + i * (master_height + self.gap)
                 result[win] = LayoutGeometry(
-                    master_x, y, master_width, master_height,
-                    WindowEdges.TOP | WindowEdges.BOTTOM
+                    master_x,
+                    y,
+                    master_width,
+                    master_height,
+                    WindowEdges.TOP | WindowEdges.BOTTOM,
                 )
 
             # Split stack between left and right
@@ -407,7 +447,7 @@ class CenteredMasterLayout(Layout):
             # Left stack
             if left_n > 0:
                 left_height = (usable.height - (left_n - 1) * self.gap) // left_n
-                for i, win in enumerate(windows[master_n:master_n + left_n]):
+                for i, win in enumerate(windows[master_n : master_n + left_n]):
                     y = usable.y + i * (left_height + self.gap)
                     edges = WindowEdges.LEFT
                     if i == 0:
@@ -422,7 +462,7 @@ class CenteredMasterLayout(Layout):
             if right_n > 0:
                 right_x = master_x + master_width + self.gap
                 right_height = (usable.height - (right_n - 1) * self.gap) // right_n
-                for i, win in enumerate(windows[master_n + left_n:]):
+                for i, win in enumerate(windows[master_n + left_n :]):
                     y = usable.y + i * (right_height + self.gap)
                     edges = WindowEdges.RIGHT
                     if i == 0:
@@ -439,19 +479,20 @@ class CenteredMasterLayout(Layout):
 @dataclass
 class Workspace:
     """Represents a workspace/tag containing windows."""
-    name: str
-    windows: List['Window'] = field(default_factory=list)
-    layout: Layout = field(default_factory=TilingLayout)
-    focused_window: Optional['Window'] = None
 
-    def add_window(self, window: 'Window'):
+    name: str
+    windows: List["Window"] = field(default_factory=list)
+    layout: Layout = field(default_factory=TilingLayout)
+    focused_window: Optional["Window"] = None
+
+    def add_window(self, window: "Window"):
         """Add a window to the workspace."""
         if window not in self.windows:
             self.windows.append(window)
             if self.focused_window is None:
                 self.focused_window = window
 
-    def remove_window(self, window: 'Window'):
+    def remove_window(self, window: "Window"):
         """Remove a window from the workspace."""
         if window in self.windows:
             self.windows.remove(window)
@@ -481,7 +522,10 @@ class Workspace:
             return
         idx = self.windows.index(self.focused_window)
         next_idx = (idx + 1) % len(self.windows)
-        self.windows[idx], self.windows[next_idx] = self.windows[next_idx], self.windows[idx]
+        self.windows[idx], self.windows[next_idx] = (
+            self.windows[next_idx],
+            self.windows[idx],
+        )
 
     def swap_prev(self):
         """Swap focused window with previous."""
@@ -489,7 +533,10 @@ class Workspace:
             return
         idx = self.windows.index(self.focused_window)
         prev_idx = (idx - 1) % len(self.windows)
-        self.windows[idx], self.windows[prev_idx] = self.windows[prev_idx], self.windows[idx]
+        self.windows[idx], self.windows[prev_idx] = (
+            self.windows[prev_idx],
+            self.windows[idx],
+        )
 
     def promote(self):
         """Promote focused window to master."""
@@ -506,10 +553,14 @@ class LayoutManager:
     """
 
     def __init__(self):
-        self.outputs: Dict[int, 'Output'] = {}
-        self.workspaces: Dict[int, Dict[int, Workspace]] = {}  # output_id -> workspace_id -> Workspace
+        self.outputs: Dict[int, "Output"] = {}
+        self.workspaces: Dict[int, Dict[int, Workspace]] = (
+            {}
+        )  # output_id -> workspace_id -> Workspace
         self.active_workspace: Dict[int, int] = {}  # output_id -> active workspace id
-        self.window_workspace: Dict[int, Tuple[int, int]] = {}  # window_id -> (output_id, workspace_id)
+        self.window_workspace: Dict[int, Tuple[int, int]] = (
+            {}
+        )  # window_id -> (output_id, workspace_id)
 
         # Available layouts
         self.layouts: List[Layout] = [
@@ -526,41 +577,46 @@ class LayoutManager:
         self.gap = 4
         self.border_width = 2
         self.border_color = BorderConfig(
-            edges=WindowEdges.TOP | WindowEdges.BOTTOM | WindowEdges.LEFT | WindowEdges.RIGHT,
+            edges=WindowEdges.TOP
+            | WindowEdges.BOTTOM
+            | WindowEdges.LEFT
+            | WindowEdges.RIGHT,
             width=2,
-            r=0x4c4c4c,
-            g=0x4c4c4c,
-            b=0x4c4c4c,
-            a=0xFFFFFFFF
+            r=0x4C4C4C,
+            g=0x4C4C4C,
+            b=0x4C4C4C,
+            a=0xFFFFFFFF,
         )
         self.focused_border_color = BorderConfig(
-            edges=WindowEdges.TOP | WindowEdges.BOTTOM | WindowEdges.LEFT | WindowEdges.RIGHT,
+            edges=WindowEdges.TOP
+            | WindowEdges.BOTTOM
+            | WindowEdges.LEFT
+            | WindowEdges.RIGHT,
             width=2,
-            r=0x5294e2,
-            g=0x5294e2,
-            b=0x5294e2,
-            a=0xFFFFFFFF
+            r=0x5294E2,
+            g=0x5294E2,
+            b=0x5294E2,
+            a=0xFFFFFFFF,
         )
 
-    def add_output(self, output: 'Output'):
+    def add_output(self, output: "Output"):
         """Add an output to manage."""
         self.outputs[output.object_id] = output
         self.workspaces[output.object_id] = {}
         for i in range(1, self.num_workspaces + 1):
             self.workspaces[output.object_id][i] = Workspace(
-                name=str(i),
-                layout=TilingLayout(gap=self.gap)
+                name=str(i), layout=TilingLayout(gap=self.gap)
             )
         self.active_workspace[output.object_id] = 1
 
-    def remove_output(self, output: 'Output'):
+    def remove_output(self, output: "Output"):
         """Remove an output from management."""
         if output.object_id in self.outputs:
             del self.outputs[output.object_id]
             del self.workspaces[output.object_id]
             del self.active_workspace[output.object_id]
 
-    def add_window(self, window: 'Window', output: Optional['Output'] = None):
+    def add_window(self, window: "Window", output: Optional["Output"] = None):
         """Add a window to the layout."""
         if output is None:
             # Use first available output
@@ -575,7 +631,7 @@ class LayoutManager:
             self.workspaces[output_id][ws_id].add_window(window)
             self.window_workspace[window.object_id] = (output_id, ws_id)
 
-    def remove_window(self, window: 'Window'):
+    def remove_window(self, window: "Window"):
         """Remove a window from the layout."""
         if window.object_id in self.window_workspace:
             output_id, ws_id = self.window_workspace[window.object_id]
@@ -583,7 +639,7 @@ class LayoutManager:
                 self.workspaces[output_id][ws_id].remove_window(window)
             del self.window_workspace[window.object_id]
 
-    def get_active_workspace(self, output: 'Output') -> Optional[Workspace]:
+    def get_active_workspace(self, output: "Output") -> Optional[Workspace]:
         """Get the active workspace for an output."""
         output_id = output.object_id
         if output_id not in self.active_workspace:
@@ -591,13 +647,13 @@ class LayoutManager:
         ws_id = self.active_workspace[output_id]
         return self.workspaces.get(output_id, {}).get(ws_id)
 
-    def switch_workspace(self, output: 'Output', workspace_id: int):
+    def switch_workspace(self, output: "Output", workspace_id: int):
         """Switch to a different workspace."""
         output_id = output.object_id
         if output_id in self.workspaces and workspace_id in self.workspaces[output_id]:
             self.active_workspace[output_id] = workspace_id
 
-    def move_window_to_workspace(self, window: 'Window', workspace_id: int):
+    def move_window_to_workspace(self, window: "Window", workspace_id: int):
         """Move a window to a different workspace."""
         if window.object_id not in self.window_workspace:
             return
@@ -613,7 +669,7 @@ class LayoutManager:
                 self.workspaces[output_id][workspace_id].add_window(window)
                 self.window_workspace[window.object_id] = (output_id, workspace_id)
 
-    def cycle_layout(self, output: 'Output', direction: int = 1):
+    def cycle_layout(self, output: "Output", direction: int = 1):
         """Cycle through available layouts."""
         workspace = self.get_active_workspace(output)
         if workspace is None:
@@ -629,7 +685,7 @@ class LayoutManager:
         # Use the layout instance from self.layouts
         workspace.layout = self.layouts[new_idx]
 
-    def calculate_layout(self, output: 'Output') -> Dict['Window', LayoutGeometry]:
+    def calculate_layout(self, output: "Output") -> Dict["Window", LayoutGeometry]:
         """Calculate the layout for an output."""
         workspace = self.get_active_workspace(output)
         if workspace is None:

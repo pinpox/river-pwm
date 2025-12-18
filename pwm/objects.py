@@ -10,12 +10,27 @@ from typing import Callable, Dict, List, Optional, TYPE_CHECKING
 from enum import Enum, auto
 
 from .protocol import (
-    ProtocolObject, MessageEncoder, MessageDecoder, WaylandMessage,
-    DecorationHint, WindowEdges, WindowCapabilities, Modifiers,
-    DimensionHint, Position, Dimensions, Area, BorderConfig,
-    RiverWindowV1, RiverNodeV1, RiverOutputV1, RiverSeatV1,
-    RiverPointerBindingV1, RiverXkbBindingV1,
-    RiverLayerShellOutputV1, RiverLayerShellSeatV1,
+    ProtocolObject,
+    MessageEncoder,
+    MessageDecoder,
+    WaylandMessage,
+    DecorationHint,
+    WindowEdges,
+    WindowCapabilities,
+    Modifiers,
+    DimensionHint,
+    Position,
+    Dimensions,
+    Area,
+    BorderConfig,
+    RiverWindowV1,
+    RiverNodeV1,
+    RiverOutputV1,
+    RiverSeatV1,
+    RiverPointerBindingV1,
+    RiverXkbBindingV1,
+    RiverLayerShellOutputV1,
+    RiverLayerShellSeatV1,
 )
 
 if TYPE_CHECKING:
@@ -24,6 +39,7 @@ if TYPE_CHECKING:
 
 class WindowState(Enum):
     """Window state tracking."""
+
     NORMAL = auto()
     MAXIMIZED = auto()
     FULLSCREEN = auto()
@@ -33,7 +49,7 @@ class WindowState(Enum):
 class Window(ProtocolObject):
     """Represents a managed window."""
 
-    def __init__(self, object_id: int, manager: 'WindowManager'):
+    def __init__(self, object_id: int, manager: "WindowManager"):
         super().__init__(object_id, RiverWindowV1.INTERFACE)
         self.manager = manager
 
@@ -64,8 +80,8 @@ class Window(ProtocolObject):
         self.node: Optional[Node] = None
 
         # Pending requests from window
-        self.pending_pointer_move: Optional['Seat'] = None
-        self.pending_pointer_resize: Optional[tuple['Seat', WindowEdges]] = None
+        self.pending_pointer_move: Optional["Seat"] = None
+        self.pending_pointer_resize: Optional[tuple["Seat", WindowEdges]] = None
         self.pending_maximize = False
         self.pending_unmaximize = False
         self.pending_fullscreen: Optional[Output] = None
@@ -138,14 +154,16 @@ class Window(ProtocolObject):
         """Request window to close (manage state)."""
         self.manager.send_request(self.object_id, RiverWindowV1.Request.CLOSE)
 
-    def get_node(self) -> 'Node':
+    def get_node(self) -> "Node":
         """Get or create the render node for this window."""
         if self.node is None:
             node_id = self.manager.connection.allocate_id()
             self.node = Node(node_id, self.manager)
             self.manager.connection.register_object(self.node)
             payload = MessageEncoder().new_id(node_id).bytes()
-            self.manager.send_request(self.object_id, RiverWindowV1.Request.GET_NODE, payload)
+            self.manager.send_request(
+                self.object_id, RiverWindowV1.Request.GET_NODE, payload
+            )
         return self.node
 
     def propose_dimensions(self, width: int, height: int):
@@ -154,7 +172,9 @@ class Window(ProtocolObject):
         self._proposed_height = height
         self._dimensions_proposed = True
         payload = MessageEncoder().int32(width).int32(height).bytes()
-        self.manager.send_request(self.object_id, RiverWindowV1.Request.PROPOSE_DIMENSIONS, payload)
+        self.manager.send_request(
+            self.object_id, RiverWindowV1.Request.PROPOSE_DIMENSIONS, payload
+        )
 
     def hide(self):
         """Hide the window (render state)."""
@@ -176,58 +196,80 @@ class Window(ProtocolObject):
 
     def set_borders(self, config: BorderConfig):
         """Set window borders (render state)."""
-        payload = (MessageEncoder()
-                   .uint32(config.edges.value)
-                   .int32(config.width)
-                   .uint32(config.r)
-                   .uint32(config.g)
-                   .uint32(config.b)
-                   .uint32(config.a)
-                   .bytes())
-        self.manager.send_request(self.object_id, RiverWindowV1.Request.SET_BORDERS, payload)
+        payload = (
+            MessageEncoder()
+            .uint32(config.edges.value)
+            .int32(config.width)
+            .uint32(config.r)
+            .uint32(config.g)
+            .uint32(config.b)
+            .uint32(config.a)
+            .bytes()
+        )
+        self.manager.send_request(
+            self.object_id, RiverWindowV1.Request.SET_BORDERS, payload
+        )
 
     def set_tiled(self, edges: WindowEdges):
         """Set tiled state (manage state)."""
         payload = MessageEncoder().uint32(edges.value).bytes()
-        self.manager.send_request(self.object_id, RiverWindowV1.Request.SET_TILED, payload)
+        self.manager.send_request(
+            self.object_id, RiverWindowV1.Request.SET_TILED, payload
+        )
 
     def set_capabilities(self, caps: WindowCapabilities):
         """Set supported capabilities (manage state)."""
         payload = MessageEncoder().uint32(caps.value).bytes()
-        self.manager.send_request(self.object_id, RiverWindowV1.Request.SET_CAPABILITIES, payload)
+        self.manager.send_request(
+            self.object_id, RiverWindowV1.Request.SET_CAPABILITIES, payload
+        )
 
     def inform_resize_start(self):
         """Inform window resize is starting (manage state)."""
-        self.manager.send_request(self.object_id, RiverWindowV1.Request.INFORM_RESIZE_START)
+        self.manager.send_request(
+            self.object_id, RiverWindowV1.Request.INFORM_RESIZE_START
+        )
 
     def inform_resize_end(self):
         """Inform window resize has ended (manage state)."""
-        self.manager.send_request(self.object_id, RiverWindowV1.Request.INFORM_RESIZE_END)
+        self.manager.send_request(
+            self.object_id, RiverWindowV1.Request.INFORM_RESIZE_END
+        )
 
     def inform_maximized(self):
         """Inform window it is maximized (manage state)."""
         self.state = WindowState.MAXIMIZED
-        self.manager.send_request(self.object_id, RiverWindowV1.Request.INFORM_MAXIMIZED)
+        self.manager.send_request(
+            self.object_id, RiverWindowV1.Request.INFORM_MAXIMIZED
+        )
 
     def inform_unmaximized(self):
         """Inform window it is unmaximized (manage state)."""
         self.state = WindowState.NORMAL
-        self.manager.send_request(self.object_id, RiverWindowV1.Request.INFORM_UNMAXIMIZED)
+        self.manager.send_request(
+            self.object_id, RiverWindowV1.Request.INFORM_UNMAXIMIZED
+        )
 
     def inform_fullscreen(self):
         """Inform window it is fullscreen (manage state)."""
-        self.manager.send_request(self.object_id, RiverWindowV1.Request.INFORM_FULLSCREEN)
+        self.manager.send_request(
+            self.object_id, RiverWindowV1.Request.INFORM_FULLSCREEN
+        )
 
     def inform_not_fullscreen(self):
         """Inform window it is not fullscreen (manage state)."""
-        self.manager.send_request(self.object_id, RiverWindowV1.Request.INFORM_NOT_FULLSCREEN)
+        self.manager.send_request(
+            self.object_id, RiverWindowV1.Request.INFORM_NOT_FULLSCREEN
+        )
 
-    def fullscreen(self, output: 'Output'):
+    def fullscreen(self, output: "Output"):
         """Make window fullscreen on output (manage state)."""
         self.state = WindowState.FULLSCREEN
         self.fullscreen_output = output
         payload = MessageEncoder().object(output).bytes()
-        self.manager.send_request(self.object_id, RiverWindowV1.Request.FULLSCREEN, payload)
+        self.manager.send_request(
+            self.object_id, RiverWindowV1.Request.FULLSCREEN, payload
+        )
 
     def exit_fullscreen(self):
         """Exit fullscreen mode (manage state)."""
@@ -239,7 +281,7 @@ class Window(ProtocolObject):
 class Node(ProtocolObject):
     """Represents a render list node."""
 
-    def __init__(self, object_id: int, manager: 'WindowManager'):
+    def __init__(self, object_id: int, manager: "WindowManager"):
         super().__init__(object_id, RiverNodeV1.INTERFACE)
         self.manager = manager
         self.x: int = 0
@@ -250,7 +292,9 @@ class Node(ProtocolObject):
         self.x = x
         self.y = y
         payload = MessageEncoder().int32(x).int32(y).bytes()
-        self.manager.send_request(self.object_id, RiverNodeV1.Request.SET_POSITION, payload)
+        self.manager.send_request(
+            self.object_id, RiverNodeV1.Request.SET_POSITION, payload
+        )
 
     def place_top(self):
         """Place above all other nodes (render state)."""
@@ -260,21 +304,25 @@ class Node(ProtocolObject):
         """Place below all other nodes (render state)."""
         self.manager.send_request(self.object_id, RiverNodeV1.Request.PLACE_BOTTOM)
 
-    def place_above(self, other: 'Node'):
+    def place_above(self, other: "Node"):
         """Place above another node (render state)."""
         payload = MessageEncoder().object(other).bytes()
-        self.manager.send_request(self.object_id, RiverNodeV1.Request.PLACE_ABOVE, payload)
+        self.manager.send_request(
+            self.object_id, RiverNodeV1.Request.PLACE_ABOVE, payload
+        )
 
-    def place_below(self, other: 'Node'):
+    def place_below(self, other: "Node"):
         """Place below another node (render state)."""
         payload = MessageEncoder().object(other).bytes()
-        self.manager.send_request(self.object_id, RiverNodeV1.Request.PLACE_BELOW, payload)
+        self.manager.send_request(
+            self.object_id, RiverNodeV1.Request.PLACE_BELOW, payload
+        )
 
 
 class Output(ProtocolObject):
     """Represents a logical output."""
 
-    def __init__(self, object_id: int, manager: 'WindowManager'):
+    def __init__(self, object_id: int, manager: "WindowManager"):
         super().__init__(object_id, RiverOutputV1.INTERFACE)
         self.manager = manager
 
@@ -286,7 +334,7 @@ class Output(ProtocolObject):
         self.removed = False
 
         # Layer shell support
-        self.layer_shell_output: Optional['LayerShellOutput'] = None
+        self.layer_shell_output: Optional["LayerShellOutput"] = None
 
         # Callbacks
         self.on_removed: Optional[Callable[[], None]] = None
@@ -320,7 +368,7 @@ class Output(ProtocolObject):
 class Seat(ProtocolObject):
     """Represents a seat (input devices + focus)."""
 
-    def __init__(self, object_id: int, manager: 'WindowManager'):
+    def __init__(self, object_id: int, manager: "WindowManager"):
         super().__init__(object_id, RiverSeatV1.INTERFACE)
         self.manager = manager
 
@@ -336,11 +384,11 @@ class Seat(ProtocolObject):
         self.op_released = False
 
         # Layer shell support
-        self.layer_shell_seat: Optional['LayerShellSeat'] = None
+        self.layer_shell_seat: Optional["LayerShellSeat"] = None
 
         # Bindings
-        self.pointer_bindings: Dict[int, 'PointerBinding'] = {}
-        self.xkb_bindings: Dict[int, 'XkbBinding'] = {}
+        self.pointer_bindings: Dict[int, "PointerBinding"] = {}
+        self.xkb_bindings: Dict[int, "XkbBinding"] = {}
 
         # Callbacks
         self.on_removed: Optional[Callable[[], None]] = None
@@ -393,7 +441,9 @@ class Seat(ProtocolObject):
     def focus_window(self, window: Window):
         """Focus a window (manage state)."""
         payload = MessageEncoder().object(window).bytes()
-        self.manager.send_request(self.object_id, RiverSeatV1.Request.FOCUS_WINDOW, payload)
+        self.manager.send_request(
+            self.object_id, RiverSeatV1.Request.FOCUS_WINDOW, payload
+        )
 
     def clear_focus(self):
         """Clear keyboard focus (manage state)."""
@@ -410,27 +460,39 @@ class Seat(ProtocolObject):
         """End an interactive operation (manage state)."""
         self.manager.send_request(self.object_id, RiverSeatV1.Request.OP_END)
 
-    def get_pointer_binding(self, button: int, modifiers: Modifiers) -> 'PointerBinding':
+    def get_pointer_binding(
+        self, button: int, modifiers: Modifiers
+    ) -> "PointerBinding":
         """Create a pointer binding."""
         binding_id = self.manager.connection.allocate_id()
         binding = PointerBinding(binding_id, self.manager, self, button, modifiers)
         self.pointer_bindings[binding_id] = binding
         self.manager.connection.register_object(binding)
 
-        payload = (MessageEncoder()
-                   .new_id(binding_id)
-                   .uint32(button)
-                   .uint32(modifiers.value)
-                   .bytes())
-        self.manager.send_request(self.object_id, RiverSeatV1.Request.GET_POINTER_BINDING, payload)
+        payload = (
+            MessageEncoder()
+            .new_id(binding_id)
+            .uint32(button)
+            .uint32(modifiers.value)
+            .bytes()
+        )
+        self.manager.send_request(
+            self.object_id, RiverSeatV1.Request.GET_POINTER_BINDING, payload
+        )
         return binding
 
 
 class PointerBinding(ProtocolObject):
     """Represents a pointer binding."""
 
-    def __init__(self, object_id: int, manager: 'WindowManager', seat: Seat,
-                 button: int, modifiers: Modifiers):
+    def __init__(
+        self,
+        object_id: int,
+        manager: "WindowManager",
+        seat: Seat,
+        button: int,
+        modifiers: Modifiers,
+    ):
         super().__init__(object_id, RiverPointerBindingV1.INTERFACE)
         self.manager = manager
         self.seat = seat
@@ -465,8 +527,14 @@ class PointerBinding(ProtocolObject):
 class XkbBinding(ProtocolObject):
     """Represents an XKB key binding."""
 
-    def __init__(self, object_id: int, manager: 'WindowManager', seat: Seat,
-                 keysym: int, modifiers: Modifiers):
+    def __init__(
+        self,
+        object_id: int,
+        manager: "WindowManager",
+        seat: Seat,
+        keysym: int,
+        modifiers: Modifiers,
+    ):
         super().__init__(object_id, RiverXkbBindingV1.INTERFACE)
         self.manager = manager
         self.seat = seat
@@ -492,7 +560,9 @@ class XkbBinding(ProtocolObject):
         """Set layout override (manage state)."""
         self.layout_override = layout
         payload = MessageEncoder().uint32(layout).bytes()
-        self.manager.send_request(self.object_id, RiverXkbBindingV1.Request.SET_LAYOUT_OVERRIDE, payload)
+        self.manager.send_request(
+            self.object_id, RiverXkbBindingV1.Request.SET_LAYOUT_OVERRIDE, payload
+        )
 
     def enable(self):
         """Enable the binding (manage state)."""
@@ -508,7 +578,7 @@ class XkbBinding(ProtocolObject):
 class LayerShellOutput(ProtocolObject):
     """Represents layer shell output state."""
 
-    def __init__(self, object_id: int, manager: 'WindowManager', output: Output):
+    def __init__(self, object_id: int, manager: "WindowManager", output: Output):
         super().__init__(object_id, RiverLayerShellOutputV1.INTERFACE)
         self.manager = manager
         self.output = output
@@ -528,13 +598,15 @@ class LayerShellOutput(ProtocolObject):
 
     def set_default(self):
         """Set as default output for layer surfaces (manage state)."""
-        self.manager.send_request(self.object_id, RiverLayerShellOutputV1.Request.SET_DEFAULT)
+        self.manager.send_request(
+            self.object_id, RiverLayerShellOutputV1.Request.SET_DEFAULT
+        )
 
 
 class LayerShellSeat(ProtocolObject):
     """Represents layer shell seat state."""
 
-    def __init__(self, object_id: int, manager: 'WindowManager', seat: Seat):
+    def __init__(self, object_id: int, manager: "WindowManager", seat: Seat):
         super().__init__(object_id, RiverLayerShellSeatV1.INTERFACE)
         self.manager = manager
         self.seat = seat

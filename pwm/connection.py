@@ -12,14 +12,13 @@ import select
 from typing import Callable, Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, field
 
-from .protocol import (
-    WaylandMessage, MessageEncoder, MessageDecoder, ProtocolObject
-)
+from .protocol import WaylandMessage, MessageEncoder, MessageDecoder, ProtocolObject
 
 
 @dataclass
 class GlobalInfo:
     """Information about a Wayland global."""
+
     name: int
     interface: str
     version: int
@@ -70,14 +69,14 @@ class WaylandConnection:
     def connect(self, display_name: Optional[str] = None) -> bool:
         """Connect to the Wayland display."""
         if display_name is None:
-            display_name = os.environ.get('WAYLAND_DISPLAY', 'wayland-0')
+            display_name = os.environ.get("WAYLAND_DISPLAY", "wayland-0")
 
         # Try XDG_RUNTIME_DIR first
-        runtime_dir = os.environ.get('XDG_RUNTIME_DIR')
+        runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
         if runtime_dir:
             socket_path = os.path.join(runtime_dir, display_name)
         else:
-            socket_path = f'/tmp/{display_name}'
+            socket_path = f"/tmp/{display_name}"
 
         try:
             self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -113,7 +112,7 @@ class WaylandConnection:
         """Get a registered protocol object."""
         return self._objects.get(obj_id)
 
-    def send_message(self, object_id: int, opcode: int, payload: bytes = b''):
+    def send_message(self, object_id: int, opcode: int, payload: bytes = b""):
         """Queue a message to be sent."""
         msg = WaylandMessage(object_id, opcode, payload)
         self.send_buffer.extend(msg.encode())
@@ -188,13 +187,13 @@ class WaylandConnection:
                 interface = decoder.string()
                 version = decoder.uint32()
                 self.globals[name] = GlobalInfo(name, interface, version)
-                self._dispatch_event('wl_registry', 'global', name, interface, version)
+                self._dispatch_event("wl_registry", "global", name, interface, version)
             elif msg.opcode == self.WL_REGISTRY_GLOBAL_REMOVE:
                 decoder = MessageDecoder(msg.payload)
                 name = decoder.uint32()
                 if name in self.globals:
                     del self.globals[name]
-                self._dispatch_event('wl_registry', 'global_remove', name)
+                self._dispatch_event("wl_registry", "global_remove", name)
             return
 
         # Handle wl_callback events (for sync)
@@ -210,7 +209,7 @@ class WaylandConnection:
         obj = self._objects.get(msg.object_id)
         if obj:
             # First try direct dispatch if object has handle_event method
-            if hasattr(obj, 'handle_event'):
+            if hasattr(obj, "handle_event"):
                 obj.handle_event(msg)
             else:
                 # Fall back to event handler system
@@ -250,12 +249,14 @@ class WaylandConnection:
             raise RuntimeError("Registry not initialized")
 
         obj_id = self.allocate_id()
-        payload = (MessageEncoder()
-                   .uint32(name)
-                   .string(interface)
-                   .uint32(version)
-                   .new_id(obj_id)
-                   .bytes())
+        payload = (
+            MessageEncoder()
+            .uint32(name)
+            .string(interface)
+            .uint32(version)
+            .new_id(obj_id)
+            .bytes()
+        )
         self.send_message(self.registry_id, self.WL_REGISTRY_BIND, payload)
         return obj_id
 
@@ -287,10 +288,7 @@ class WaylandConnection:
 
         # Check for readable data
         readable, writable, _ = select.select(
-            [self.socket],
-            [self.socket] if self.send_buffer else [],
-            [],
-            timeout
+            [self.socket], [self.socket] if self.send_buffer else [], [], timeout
         )
 
         # Send pending data

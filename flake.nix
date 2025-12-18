@@ -5,12 +5,15 @@
   inputs.nixpkgs.url = "nixpkgs/nixos-unstable";
   inputs.river-src.url = "github:riverwm/river";
   inputs.river-src.flake = false;
+  inputs.treefmt-nix.url = "github:numtide/treefmt-nix";
+  inputs.treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
 
   outputs =
     {
       self,
       nixpkgs,
       river-src,
+      treefmt-nix,
     }:
     let
 
@@ -26,6 +29,16 @@
       # Nixpkgs instantiated for supported system types.
       nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system; });
 
+      # treefmt configuration
+      treefmtEval = forAllSystems (
+        system:
+        treefmt-nix.lib.evalModule nixpkgsFor.${system} {
+          projectRootFile = "flake.nix";
+          programs.nixfmt.enable = true;
+          programs.black.enable = true;
+        }
+      );
+
     in
     {
 
@@ -40,7 +53,7 @@
           # Python library package
           pwm-lib = pkgs.python3Packages.buildPythonPackage {
             pname = "pwm";
-            version = "0.1.0";
+            inherit version;
             src = ./.;
 
             format = "setuptools";
@@ -61,6 +74,8 @@
             ];
           } (builtins.readFile ./pwm.py);
 
+          # River compositor. Packaged here for now, since nixpkgs only has the
+          # older river-classic version
           river = pkgs.stdenv.mkDerivation (finalAttrs: {
             pname = "river";
             inherit version;
@@ -175,5 +190,13 @@
           default = self.packages.${system}.river-pwm;
         }
       );
+
+      # Formatter for `nix fmt`
+      formatter = forAllSystems (system: treefmtEval.${system}.config.build.wrapper);
+
+      # Format checks for CI
+      checks = forAllSystems (system: {
+        formatting = treefmtEval.${system}.config.build.check self;
+      });
     };
 }
