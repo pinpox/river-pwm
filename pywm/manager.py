@@ -163,7 +163,13 @@ class WindowManager:
 
     def _handle_wm_event(self, msg: WaylandMessage):
         """Handle window manager events."""
-        decoder = MessageDecoder(msg.payload)
+        try:
+            decoder = MessageDecoder(msg.payload)
+        except Exception as e:
+            print(f"[DEBUG] Error creating decoder: {e}")
+            import traceback
+            traceback.print_exc()
+            return
 
         if msg.opcode == RiverWindowManagerV1.Event.UNAVAILABLE:
             print("Window management unavailable (another WM running?)")
@@ -207,7 +213,9 @@ class WindowManager:
                 self.on_window_created(window)
 
         elif msg.opcode == RiverWindowManagerV1.Event.OUTPUT:
+            print(f"[DEBUG] Handling OUTPUT event")
             output_id = decoder.new_id()
+            print(f"[DEBUG] Creating output with id={output_id}")
             output = Output(output_id, self)
             self.outputs[output_id] = output
             self.connection.register_object(output)
@@ -215,11 +223,14 @@ class WindowManager:
             # Create layer shell output if available
             if self.layer_shell_id:
                 self._create_layer_shell_output(output)
+            print(f"[DEBUG] Calling on_output_created callback: {self.on_output_created}")
             if self.on_output_created:
                 self.on_output_created(output)
 
         elif msg.opcode == RiverWindowManagerV1.Event.SEAT:
+            print(f"[DEBUG] Handling SEAT event")
             seat_id = decoder.new_id()
+            print(f"[DEBUG] Creating seat with id={seat_id}")
             seat = Seat(seat_id, self)
             self.seats[seat_id] = seat
             self.connection.register_object(seat)
@@ -227,6 +238,7 @@ class WindowManager:
             # Create layer shell seat if available
             if self.layer_shell_id:
                 self._create_layer_shell_seat(seat)
+            print(f"[DEBUG] Calling on_seat_created callback: {self.on_seat_created}")
             if self.on_seat_created:
                 self.on_seat_created(seat)
 
