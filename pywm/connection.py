@@ -209,7 +209,12 @@ class WaylandConnection:
         # Dispatch to registered handlers
         obj = self._objects.get(msg.object_id)
         if obj:
-            self._dispatch_event(obj.interface_name, msg.opcode, msg)
+            # First try direct dispatch if object has handle_event method
+            if hasattr(obj, 'handle_event'):
+                obj.handle_event(msg)
+            else:
+                # Fall back to event handler system
+                self._dispatch_event(obj.interface_name, msg.opcode, msg)
 
     def _dispatch_event(self, interface: str, event: Any, *args):
         """Dispatch event to handlers."""
