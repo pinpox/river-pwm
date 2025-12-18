@@ -416,7 +416,9 @@ class RiverWM:
         # Propose dimensions for all windows
         if self.focused_output:
             geometries = self.layout_manager.calculate_layout(self.focused_output)
+            print(f"[DEBUG] Proposing dimensions for {len(geometries)} windows")
             for window, geom in geometries.items():
+                print(f"[DEBUG] Window {window.object_id:x}: proposing dimensions {geom.width}x{geom.height}")
                 window.propose_dimensions(geom.width, geom.height)
                 window.set_tiled(geom.tiled_edges)
 
