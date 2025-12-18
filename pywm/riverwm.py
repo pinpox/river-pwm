@@ -415,6 +415,7 @@ class RiverWM:
 
         # Propose dimensions for all windows
         if self.focused_output:
+            print(f"[DEBUG] Output dimensions: {self.focused_output.width}x{self.focused_output.height}")
             geometries = self.layout_manager.calculate_layout(self.focused_output)
             print(f"[DEBUG] Proposing dimensions for {len(geometries)} windows")
             for window, geom in geometries.items():
