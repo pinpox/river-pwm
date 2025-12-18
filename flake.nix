@@ -137,68 +137,47 @@
           river-pwm = pkgs.writeShellScriptBin "river-pwm" ''
             set -e
 
-            # Start River compositor with custom init script in the background
-            echo "Starting River compositor..."
-            ${self.packages.${system}.river}/bin/river -c "exit 0" &
-            RIVER_PID=$!
+            # Detect if running in nested mode (inside another compositor)
+            if [ -n "$WAYLAND_DISPLAY" ] || [ -n "$DISPLAY" ]; then
+              echo "Starting River compositor in nested mode..."
+              echo "Key bindings: Alt + Return (terminal), Alt + Q (close), Alt + Shift + Q (quit)"
+              echo ""
 
-            # Wait for River to be ready by checking for the Wayland socket
-            echo "Waiting for River to initialize..."
-            for i in {1..30}; do
-              if [ -n "$WAYLAND_DISPLAY" ] && [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
-                echo "River is ready (display: $WAYLAND_DISPLAY)"
-                break
-              fi
-              sleep 0.5
-            done
+              # River auto-detects nested mode and runs in a window
+              exec ${self.packages.${system}.river}/bin/river -c "${self.packages.${system}.pwm}/bin/pwm"
+            else
+              # Running on bare metal - start River in background then pwm
+              echo "Starting River compositor..."
+              ${self.packages.${system}.river}/bin/river -c "exit 0" &
+              RIVER_PID=$!
 
-            # Start pwm window manager
-            echo "Starting pwm window manager..."
-            ${self.packages.${system}.pwm}/bin/pwm
-            EXIT_CODE=$?
+              # Wait for River to be ready by checking for the Wayland socket
+              echo "Waiting for River to initialize..."
+              for i in {1..30}; do
+                if [ -n "$WAYLAND_DISPLAY" ] && [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
+                  echo "River is ready (display: $WAYLAND_DISPLAY)"
+                  break
+                fi
+                sleep 0.5
+              done
 
-            # When pwm exits, kill River
-            echo "Shutting down River compositor..."
-            kill $RIVER_PID 2>/dev/null || true
-            wait $RIVER_PID 2>/dev/null || true
+              # Start pwm window manager
+              echo "Starting pwm window manager..."
+              ${self.packages.${system}.pwm}/bin/pwm
+              EXIT_CODE=$?
 
-            exit $EXIT_CODE
-          '';
+              # When pwm exits, kill River
+              echo "Shutting down River compositor..."
+              kill $RIVER_PID 2>/dev/null || true
+              wait $RIVER_PID 2>/dev/null || true
 
-          # Nested version that runs in a window for testing
-          river-pwm-nested = pkgs.writeShellScriptBin "river-pwm-nested" ''
-            set -e
-
-            # Check if we're already in a Wayland or X11 session
-            if [ -z "$WAYLAND_DISPLAY" ] && [ -z "$DISPLAY" ]; then
-              echo "Error: Not running in a graphical session"
-              echo "Please run this from within Wayland or X11"
-              exit 1
+              exit $EXIT_CODE
             fi
-
-            echo "Starting River compositor in nested mode..."
-            echo "Key bindings: Alt + Return (terminal), Alt + Q (close), Alt + Shift + Q (quit)"
-            echo ""
-
-            # River auto-detects nested mode when WAYLAND_DISPLAY or DISPLAY is set
-            ${self.packages.${system}.river}/bin/river -c "${self.packages.${system}.pwm}/bin/pwm"
           '';
 
-          default = self.packages.${system}.river;
+          default = self.packages.${system}.river-pwm;
         }
       );
 
-      # Apps for nix run
-      apps = forAllSystems (system: {
-        river-pwm = {
-          type = "app";
-          program = "${self.packages.${system}.river-pwm}/bin/river-pwm";
-        };
-        nested = {
-          type = "app";
-          program = "${self.packages.${system}.river-pwm-nested}/bin/river-pwm-nested";
-        };
-        default = self.apps.${system}.nested;
-      });
     };
 }
