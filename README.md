@@ -22,11 +22,7 @@ A tiling window manager for the River Wayland compositor, written in Python.
 ### With Nix Flakes
 
 ```bash
-# Run river-pwm (auto-detects nested or bare-metal mode)
 nix run github:pinpox/river-pwm
-
-# Install to your system
-nix profile install github:pinpox/river-pwm
 ```
 
 The script automatically detects if you're running inside another compositor:

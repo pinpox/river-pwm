@@ -178,6 +178,5 @@
           default = self.packages.${system}.river-pwm;
         }
       );
-
     };
 }
