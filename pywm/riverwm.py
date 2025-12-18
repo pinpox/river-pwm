@@ -77,8 +77,8 @@ class BTN:
 class RiverConfig:
     """Window manager configuration."""
 
-    # Key binding modifier (Super by default)
-    mod: Modifiers = Modifiers.MOD4
+    # Key binding modifier (Alt for now, to avoid conflicts in nested mode)
+    mod: Modifiers = Modifiers.MOD1
 
     # Layout settings
     gap: int = 4
@@ -677,7 +677,7 @@ class RiverWM:
             return 1
 
         print("River Window Manager started")
-        print(f"  Mod key: Super")
+        print(f"  Mod key: Alt")
         print(f"  Terminal: {self.config.terminal}")
         print(f"  Launcher: {self.config.launcher}")
 
