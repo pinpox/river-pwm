@@ -37,13 +37,13 @@
             pname = "pywm";
             version = "0.1.0";
 
-            src = ./pywm;
+            src = ./.;
 
             format = "other";
 
             installPhase = ''
               mkdir -p $out/${pkgs.python3.sitePackages}/pywm
-              cp -r * $out/${pkgs.python3.sitePackages}/pywm/
+              cp *.py $out/${pkgs.python3.sitePackages}/pywm/
 
               mkdir -p $out/bin
               cat > $out/bin/pywm <<EOF
