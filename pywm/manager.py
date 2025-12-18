@@ -96,6 +96,7 @@ class WindowManager:
         )
 
         # Register the wm object so events are dispatched to it
+        # This is critical - without this, River events won't be received!
         wm_obj = ProtocolObject(self.wm_id, RiverWindowManagerV1.INTERFACE)
         self.connection.register_object(wm_obj)
 
