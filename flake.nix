@@ -33,36 +33,29 @@
         in
         {
 
-          pwm = pkgs.python3Packages.buildPythonApplication {
+          # Python library package
+          pwm-lib = pkgs.python3Packages.buildPythonPackage {
             pname = "pwm";
             version = "0.1.0";
-
             src = ./.;
 
-            format = "other";
-
-            installPhase = ''
-              mkdir -p $out/${pkgs.python3.sitePackages}/pwm
-              cp *.py $out/${pkgs.python3.sitePackages}/pwm/
-
-              mkdir -p $out/bin
-              cat > $out/bin/pwm <<EOF
-              #!${pkgs.python3}/bin/python3
-              import sys
-              from pwm.riverwm import main
-              sys.exit(main())
-              EOF
-              chmod +x $out/bin/pwm
-            '';
+            pyproject = true;
+            build-system = [ pkgs.python3Packages.setuptools ];
 
             meta = {
-              description = "pinpox' window manager - A Python window manager for River Wayland compositor";
+              description = "Python library for River window management protocol";
               license = pkgs.lib.licenses.isc;
               maintainers = with pkgs.lib.maintainers; [ pinpox ];
-              mainProgram = "pwm";
-              platforms = pkgs.lib.platforms.linux;
             };
           };
+
+          # Executable with example configuration
+          pwm = pkgs.writers.writePython3Bin "pwm"
+            {
+              libraries = [ self.packages.${system}.pwm-lib ];
+              flakeIgnore = [ "E265" "E501" ];
+            }
+            (builtins.readFile ./pwm.py);
 
           river = pkgs.stdenv.mkDerivation (finalAttrs: {
             pname = "river";
