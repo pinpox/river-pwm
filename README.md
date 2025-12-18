@@ -1,131 +1,154 @@
-# pywm - Python Window Manager for River
+# pwm - pinpox' Window Manager
 
 A tiling window manager for the River Wayland compositor, written in Python.
 
 ## Features
 
-- **Tiling Layouts**: Master-stack, grid, monocle, centered-master
-- **Floating Layout**: Traditional floating windows with mouse move/resize
+- **Multiple Layouts**: Tiling (horizontal/vertical), grid, monocle, centered-master, floating
 - **Workspaces**: 9 virtual workspaces per output
 - **Key Bindings**: Configurable keyboard shortcuts
-- **Pointer Bindings**: Mouse actions with modifier keys
 - **Multi-Output**: Full support for multiple monitors
-- **Focus-Follows-Mouse**: Optional sloppy focus mode
 - **Borders**: Configurable window borders with focus indication
+- **Pure Python**: No external dependencies, only Python standard library
 
 ## Requirements
 
-- River Wayland compositor (with river-window-management-v1 protocol)
+- River Wayland compositor 0.4.x (with river-window-management-v1 protocol)
 - Python 3.8+
-- No external Python dependencies (uses only standard library)
+- Nix (for building)
 
 ## Installation
 
-The pywm package is included in the River source tree. To use it:
+### With Nix Flakes
 
 ```bash
-# From the river directory
-python -m pywm
+# Run nested in a window (for testing)
+nix run github:pinpox/river-pwm#nested
+
+# Run on bare metal (launches River + pwm)
+nix run github:pinpox/river-pwm#river-pwm
+
+# Install to your system
+nix profile install github:pinpox/river-pwm
 ```
 
-Or install it system-wide:
+### From Source
 
 ```bash
-pip install -e pywm/
+# Clone the repository
+git clone https://github.com/pinpox/river-pwm
+cd river-pwm
+
+# Run in nested mode for testing
+nix run .#nested
+
+# Build the package
+nix build .#pwm
 ```
 
 ## Usage
 
-### Running
+### Running Nested (in a window)
+
+Perfect for testing without leaving your current desktop:
 
 ```bash
-# Basic usage
-python -m pywm
-
-# With options
-python -m pywm --terminal alacritty --launcher wofi --gap 8
-
-# As a module
-python -c "from pywm import RiverWM; RiverWM().run()"
+nix run .#nested
 ```
 
-### Configuration
+This will open River in a window with pwm managing windows inside it.
 
-Add to your River init script (`~/.config/river/init`):
+### Running on Bare Metal
+
+To use as your actual window manager:
 
 ```bash
-#!/bin/sh
-# Start the Python window manager
-python -m pywm &
+# From your display manager or .xinitrc
+nix run github:pinpox/river-pwm#river-pwm
 ```
+
+Or install and add to your display manager sessions.
 
 ### Command Line Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--terminal`, `-t` | `foot` | Terminal emulator command |
-| `--launcher`, `-l` | `fuzzel` | Application launcher command |
-| `--gap`, `-g` | `4` | Gap between windows (pixels) |
-| `--border-width`, `-b` | `2` | Border width (pixels) |
+```bash
+pwm --help
 
-## Default Key Bindings
+Options:
+  --terminal, -t TEXT       Terminal emulator (default: foot)
+  --launcher, -l TEXT       Application launcher (default: fuzzel)
+  --gap, -g INTEGER         Gap between windows in pixels (default: 4)
+  --border-width, -b INTEGER Border width in pixels (default: 2)
+```
 
-All bindings use **Super** (Windows/Logo key) as the modifier.
+## Key Bindings
+
+All bindings use **Alt** as the modifier key.
 
 ### Window Management
 
 | Binding | Action |
 |---------|--------|
-| `Super+Return` | Spawn terminal |
-| `Super+D` | Spawn launcher |
-| `Super+Q` | Close focused window |
-| `Super+Shift+Q` | Quit window manager |
+| `Alt+Return` | Spawn terminal |
+| `Alt+D` | Spawn launcher |
+| `Alt+Q` | Close focused window |
+| `Alt+Shift+Q` | Quit window manager |
 
 ### Navigation
 
 | Binding | Action |
 |---------|--------|
-| `Super+J` / `Super+Down` | Focus next window |
-| `Super+K` / `Super+Up` | Focus previous window |
-| `Super+Shift+J` | Swap with next window |
-| `Super+Shift+K` | Swap with previous window |
-| `Super+Shift+Return` | Promote to master |
+| `Alt+J` / `Alt+Down` | Focus next window |
+| `Alt+K` / `Alt+Up` | Focus previous window |
+| `Alt+Shift+J` | Swap with next window |
+| `Alt+Shift+K` | Swap with previous window |
+| `Alt+Shift+Return` | Promote focused window to master |
 
-### Layout
+### Layouts
 
 | Binding | Action |
 |---------|--------|
-| `Super+Space` | Cycle to next layout |
-| `Super+Shift+Space` | Cycle to previous layout |
-| `Super+F` | Toggle fullscreen |
+| `Alt+Space` | Cycle to next layout |
+| `Alt+Shift+Space` | Cycle to previous layout |
+| `Alt+F` | Toggle fullscreen |
 
 ### Workspaces
 
 | Binding | Action |
 |---------|--------|
-| `Super+1-9` | Switch to workspace 1-9 |
-| `Super+Shift+1-9` | Move window to workspace 1-9 |
-
-### Mouse Bindings
-
-| Binding | Action |
-|---------|--------|
-| `Super+Left Click` | Move window (enables floating) |
-| `Super+Right Click` | Resize window (enables floating) |
+| `Alt+1-9` | Switch to workspace 1-9 |
+| `Alt+Shift+1-9` | Move window to workspace 1-9 |
 
 ## Available Layouts
 
-1. **tile-right** (default): Master-stack with master on left
-2. **tile-bottom**: Master-stack with master on top
-3. **monocle**: Fullscreen stacked windows
-4. **grid**: Windows in a grid pattern
-5. **centered-master**: Master in center, stacks on sides
+1. **tile-right** (default): Master window(s) on left, stack on right
+2. **tile-bottom**: Master window(s) on top, stack on bottom
+3. **monocle**: All windows fullscreen and stacked
+4. **grid**: Windows arranged in a grid pattern
+5. **centered-master**: Master in center, stacks split on left/right sides
 6. **floating**: Traditional floating windows
+
+Cycle through layouts with `Alt+Space` / `Alt+Shift+Space`.
+
+## Project Structure
+
+```
+river-pwm/
+├── flake.nix           # Nix flake for building
+├── __init__.py         # Package exports
+├── __main__.py         # Entry point
+├── protocol.py         # Wayland protocol definitions
+├── connection.py       # Wayland socket handling
+├── objects.py          # Window, Output, Seat objects
+├── manager.py          # Core WindowManager class
+├── layout.py           # Layout algorithms
+└── riverwm.py          # Complete WM implementation
+```
 
 ## Programmatic Usage
 
 ```python
-from pywm import RiverWM, RiverConfig, TilingLayout
+from pwm import RiverWM, RiverConfig, Modifiers
 
 # Create custom configuration
 config = RiverConfig(
@@ -133,7 +156,7 @@ config = RiverConfig(
     launcher='wofi',
     gap=8,
     border_width=3,
-    focus_follows_mouse=True,
+    mod=Modifiers.MOD4,  # Use Super instead of Alt
 )
 
 # Create and run window manager
@@ -144,7 +167,7 @@ wm.run()
 ### Custom Layouts
 
 ```python
-from pywm import Layout, LayoutGeometry, Area, Window
+from pwm import Layout, LayoutGeometry, Area, Window
 
 class MyLayout(Layout):
     @property
@@ -157,26 +180,29 @@ class MyLayout(Layout):
         return result
 ```
 
-## Architecture
+## Protocol Support
 
-```
-pywm/
-├── __init__.py      # Package exports
-├── __main__.py      # Entry point
-├── protocol.py      # Wayland protocol definitions
-├── connection.py    # Wayland socket handling
-├── objects.py       # Window, Output, Seat objects
-├── manager.py       # Core WindowManager class
-├── layout.py        # Layout algorithms
-└── riverwm.py       # Complete WM implementation
-```
-
-### Protocol Support
+This implementation uses the following River protocols:
 
 - `river-window-management-v1`: Core window management
 - `river-xkb-bindings-v1`: Keyboard bindings
 - `river-layer-shell-v1`: Layer shell integration
 
+## Development
+
+The project uses Nix flakes for reproducible builds. The flake provides:
+
+- `packages.pwm`: The window manager package
+- `packages.river`: River compositor 0.4.x
+- `packages.river-pwm`: Script to launch River + pwm
+- `packages.river-pwm-nested`: Script to run in nested mode
+- `apps.nested`: Run in a window (default)
+- `apps.river-pwm`: Run on bare metal
+
 ## License
 
-Same license as River (ISC License).
+ISC License (same as River).
+
+## Credits
+
+Built for the River Wayland compositor by pinpox.
