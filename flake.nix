@@ -33,8 +33,8 @@
         in
         {
 
-          pywm = pkgs.python3Packages.buildPythonApplication {
-            pname = "pywm";
+          pwm = pkgs.python3Packages.buildPythonApplication {
+            pname = "pwm";
             version = "0.1.0";
 
             src = ./.;
@@ -42,24 +42,24 @@
             format = "other";
 
             installPhase = ''
-              mkdir -p $out/${pkgs.python3.sitePackages}/pywm
-              cp *.py $out/${pkgs.python3.sitePackages}/pywm/
+              mkdir -p $out/${pkgs.python3.sitePackages}/pwm
+              cp *.py $out/${pkgs.python3.sitePackages}/pwm/
 
               mkdir -p $out/bin
-              cat > $out/bin/pywm <<EOF
+              cat > $out/bin/pwm <<EOF
               #!${pkgs.python3}/bin/python3
               import sys
-              from pywm.riverwm import main
+              from pwm.riverwm import main
               sys.exit(main())
               EOF
-              chmod +x $out/bin/pywm
+              chmod +x $out/bin/pwm
             '';
 
             meta = {
-              description = "Python window manager for River Wayland compositor";
+              description = "pinpox' window manager - A Python window manager for River Wayland compositor";
               license = pkgs.lib.licenses.isc;
               maintainers = with pkgs.lib.maintainers; [ pinpox ];
-              mainProgram = "pywm";
+              mainProgram = "pwm";
               platforms = pkgs.lib.platforms.linux;
             };
           };
@@ -134,7 +134,7 @@
             };
           });
 
-          river-pywm = pkgs.writeShellScriptBin "river-pywm" ''
+          river-pwm = pkgs.writeShellScriptBin "river-pwm" ''
             set -e
 
             # Start River compositor with custom init script in the background
@@ -152,12 +152,12 @@
               sleep 0.5
             done
 
-            # Start pywm window manager
-            echo "Starting pywm window manager..."
-            ${self.packages.${system}.pywm}/bin/pywm
+            # Start pwm window manager
+            echo "Starting pwm window manager..."
+            ${self.packages.${system}.pwm}/bin/pwm
             EXIT_CODE=$?
 
-            # When pywm exits, kill River
+            # When pwm exits, kill River
             echo "Shutting down River compositor..."
             kill $RIVER_PID 2>/dev/null || true
             wait $RIVER_PID 2>/dev/null || true
@@ -166,7 +166,7 @@
           '';
 
           # Nested version that runs in a window for testing
-          river-pywm-nested = pkgs.writeShellScriptBin "river-pywm-nested" ''
+          river-pwm-nested = pkgs.writeShellScriptBin "river-pwm-nested" ''
             set -e
 
             # Check if we're already in a Wayland or X11 session
@@ -181,7 +181,7 @@
             echo ""
 
             # River auto-detects nested mode when WAYLAND_DISPLAY or DISPLAY is set
-            ${self.packages.${system}.river}/bin/river -c "${self.packages.${system}.pywm}/bin/pywm"
+            ${self.packages.${system}.river}/bin/river -c "${self.packages.${system}.pwm}/bin/pwm"
           '';
 
           default = self.packages.${system}.river;
@@ -190,13 +190,13 @@
 
       # Apps for nix run
       apps = forAllSystems (system: {
-        river-pywm = {
+        river-pwm = {
           type = "app";
-          program = "${self.packages.${system}.river-pywm}/bin/river-pywm";
+          program = "${self.packages.${system}.river-pwm}/bin/river-pwm";
         };
         nested = {
           type = "app";
-          program = "${self.packages.${system}.river-pywm-nested}/bin/river-pywm-nested";
+          program = "${self.packages.${system}.river-pwm-nested}/bin/river-pwm-nested";
         };
         default = self.apps.${system}.nested;
       });

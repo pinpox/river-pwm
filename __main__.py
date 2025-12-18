@@ -1,8 +1,8 @@
 """
-Main entry point for running pywm as a module.
+Main entry point for running pwm as a module.
 
 Usage:
-    python -m pywm [options]
+    python -m pwm [options]
 """
 
 from .riverwm import main

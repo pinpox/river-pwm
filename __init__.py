@@ -1,5 +1,5 @@
 """
-River Window Manager for Python
+pinpox' Window Manager (pwm)
 
 A Python-based tiling window manager for the River Wayland compositor.
 
@@ -11,7 +11,7 @@ This package provides:
 - A complete window manager implementation
 
 Example usage:
-    from pywm import RiverWM, RiverConfig
+    from pwm import RiverWM, RiverConfig
 
     config = RiverConfig(
         terminal='alacritty',
@@ -22,11 +22,11 @@ Example usage:
     wm.run()
 
 Or run directly:
-    python -m pywm
+    python -m pwm
 """
 
 __version__ = '0.1.0'
-__author__ = 'River Developers'
+__author__ = 'pinpox'
 
 from .protocol import (
     DecorationHint,
