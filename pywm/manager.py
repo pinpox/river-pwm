@@ -180,18 +180,26 @@ class WindowManager:
             self.running = False
 
         elif msg.opcode == RiverWindowManagerV1.Event.MANAGE_START:
+            print(f"[DEBUG] MANAGE_START event received")
             self.state = ManagerState.MANAGE
             # Process pending events
+            print(f"[DEBUG] Processing pending events...")
             self._process_pending_events()
+            print(f"[DEBUG] Calling on_manage_start callback")
             if self.on_manage_start:
                 self.on_manage_start()
+            print(f"[DEBUG] MANAGE_START handled")
 
         elif msg.opcode == RiverWindowManagerV1.Event.RENDER_START:
+            print(f"[DEBUG] RENDER_START event received")
             self.state = ManagerState.RENDER
             # Process pending events
+            print(f"[DEBUG] Processing pending events...")
             self._process_pending_events()
+            print(f"[DEBUG] Calling on_render_start callback")
             if self.on_render_start:
                 self.on_render_start()
+            print(f"[DEBUG] RENDER_START handled")
 
         elif msg.opcode == RiverWindowManagerV1.Event.SESSION_LOCKED:
             self.session_locked = True
