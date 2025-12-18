@@ -180,26 +180,18 @@ class WindowManager:
             self.running = False
 
         elif msg.opcode == RiverWindowManagerV1.Event.MANAGE_START:
-            print(f"[DEBUG] MANAGE_START event received")
             self.state = ManagerState.MANAGE
             # Process pending events
-            print(f"[DEBUG] Processing pending events...")
             self._process_pending_events()
-            print(f"[DEBUG] Calling on_manage_start callback")
             if self.on_manage_start:
                 self.on_manage_start()
-            print(f"[DEBUG] MANAGE_START handled")
 
         elif msg.opcode == RiverWindowManagerV1.Event.RENDER_START:
-            print(f"[DEBUG] RENDER_START event received")
             self.state = ManagerState.RENDER
             # Process pending events
-            print(f"[DEBUG] Processing pending events...")
             self._process_pending_events()
-            print(f"[DEBUG] Calling on_render_start callback")
             if self.on_render_start:
                 self.on_render_start()
-            print(f"[DEBUG] RENDER_START handled")
 
         elif msg.opcode == RiverWindowManagerV1.Event.SESSION_LOCKED:
             self.session_locked = True
@@ -212,22 +204,16 @@ class WindowManager:
                 self.on_session_unlocked()
 
         elif msg.opcode == RiverWindowManagerV1.Event.WINDOW:
-            print(f"[DEBUG] Handling WINDOW event, payload: {msg.payload.hex()}")
             window_id = decoder.new_id()
-            print(f"[DEBUG] Creating window with id={window_id} (0x{window_id:x})")
             window = Window(window_id, self)
             self.windows[window_id] = window
             self.connection.register_object(window)
             window.on_closed = lambda w=window: self._on_window_closed(w)
-            print(f"[DEBUG] Calling on_window_created callback")
             if self.on_window_created:
                 self.on_window_created(window)
-            print(f"[DEBUG] Window created successfully")
 
         elif msg.opcode == RiverWindowManagerV1.Event.OUTPUT:
-            print(f"[DEBUG] Handling OUTPUT event, payload: {msg.payload.hex()}")
             output_id = decoder.new_id()
-            print(f"[DEBUG] Creating output with id={output_id} (0x{output_id:x})")
             output = Output(output_id, self)
             self.outputs[output_id] = output
             self.connection.register_object(output)
@@ -235,14 +221,11 @@ class WindowManager:
             # Create layer shell output if available
             if self.layer_shell_id:
                 self._create_layer_shell_output(output)
-            print(f"[DEBUG] Calling on_output_created callback: {self.on_output_created}")
             if self.on_output_created:
                 self.on_output_created(output)
 
         elif msg.opcode == RiverWindowManagerV1.Event.SEAT:
-            print(f"[DEBUG] Handling SEAT event")
             seat_id = decoder.new_id()
-            print(f"[DEBUG] Creating seat with id={seat_id}")
             seat = Seat(seat_id, self)
             self.seats[seat_id] = seat
             self.connection.register_object(seat)
@@ -250,7 +233,6 @@ class WindowManager:
             # Create layer shell seat if available
             if self.layer_shell_id:
                 self._create_layer_shell_seat(seat)
-            print(f"[DEBUG] Calling on_seat_created callback: {self.on_seat_created}")
             if self.on_seat_created:
                 self.on_seat_created(seat)
 

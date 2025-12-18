@@ -296,24 +296,20 @@ class Output(ProtocolObject):
         decoder = MessageDecoder(msg.payload)
 
         if msg.opcode == RiverOutputV1.Event.REMOVED:
-            print(f"[DEBUG] Output {self.object_id:x}: REMOVED event")
             self.removed = True
             if self.on_removed:
                 self.on_removed()
 
         elif msg.opcode == RiverOutputV1.Event.WL_OUTPUT:
             self.wl_output_name = decoder.uint32()
-            print(f"[DEBUG] Output {self.object_id:x}: WL_OUTPUT event, name={self.wl_output_name}")
 
         elif msg.opcode == RiverOutputV1.Event.POSITION:
             self.x = decoder.int32()
             self.y = decoder.int32()
-            print(f"[DEBUG] Output {self.object_id:x}: POSITION event, pos=({self.x}, {self.y})")
 
         elif msg.opcode == RiverOutputV1.Event.DIMENSIONS:
             self.width = decoder.int32()
             self.height = decoder.int32()
-            print(f"[DEBUG] Output {self.object_id:x}: DIMENSIONS event, size={self.width}x{self.height}")
 
     @property
     def area(self) -> Area:
