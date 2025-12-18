@@ -626,9 +626,8 @@ class LayoutManager:
                 break
 
         new_idx = (current_idx + direction) % len(self.layouts)
-        # Create a new instance of the layout
-        layout_class = type(self.layouts[new_idx])
-        workspace.layout = layout_class(gap=self.gap)
+        # Use the layout instance from self.layouts
+        workspace.layout = self.layouts[new_idx]
 
     def calculate_layout(self, output: 'Output') -> Dict['Window', LayoutGeometry]:
         """Calculate the layout for an output."""
