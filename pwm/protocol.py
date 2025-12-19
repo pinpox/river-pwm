@@ -190,7 +190,7 @@ class MessageEncoder:
         File descriptors are sent via SCM_RIGHTS ancillary data, not in the
         message payload. This method just records that an FD should be sent.
         """
-        if not hasattr(self, 'fds'):
+        if not hasattr(self, "fds"):
             self.fds = []
         self.fds.append(fd)
         return self

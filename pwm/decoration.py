@@ -45,7 +45,12 @@ class DecorationRenderer:
         self.hover_button: Optional[str] = None  # "close", "minimize", "maximize"
 
     def render(
-        self, width: int, title: str, focused: bool, maximized: bool, shm_data: memoryview
+        self,
+        width: int,
+        title: str,
+        focused: bool,
+        maximized: bool,
+        shm_data: memoryview,
     ):
         """Render the titlebar to the shared memory buffer.
 
@@ -67,9 +72,7 @@ class DecorationRenderer:
         ctx = cairo.Context(surface)
 
         # Clear background
-        bg = (
-            self.style.focused_bg_color if focused else self.style.bg_color
-        )
+        bg = self.style.focused_bg_color if focused else self.style.bg_color
         self._set_color(ctx, bg)
         ctx.rectangle(0, 0, width, height)
         ctx.fill()
@@ -88,7 +91,9 @@ class DecorationRenderer:
         # Ensure drawing is complete
         surface.flush()
 
-    def _render_title(self, ctx: cairo.Context, title: str, focused: bool, max_width: int):
+    def _render_title(
+        self, ctx: cairo.Context, title: str, focused: bool, max_width: int
+    ):
         """Render the window title text.
 
         Args:
@@ -135,7 +140,12 @@ class DecorationRenderer:
         ctx.show_text(display_title)
 
     def _render_buttons(
-        self, ctx: cairo.Context, focused: bool, maximized: bool, width: int, height: int
+        self,
+        ctx: cairo.Context,
+        focused: bool,
+        maximized: bool,
+        width: int,
+        height: int,
     ):
         """Render control buttons.
 

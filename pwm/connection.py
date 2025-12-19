@@ -123,7 +123,13 @@ class WaylandConnection:
         """Get a registered protocol object."""
         return self._objects.get(obj_id)
 
-    def send_message(self, object_id: int, opcode: int, payload: bytes = b"", fds: Optional[List[int]] = None):
+    def send_message(
+        self,
+        object_id: int,
+        opcode: int,
+        payload: bytes = b"",
+        fds: Optional[List[int]] = None,
+    ):
         """Queue a message to be sent.
 
         Args:

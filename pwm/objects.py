@@ -299,12 +299,16 @@ class Window(ProtocolObject):
         """Called during render start to initialize/update decoration."""
         if self.decoration and not self.decoration.created:
             # Create decoration surface if not already created
-            print(f"DEBUG: Creating decoration for window {self.object_id}, width={self.width}")
+            print(
+                f"DEBUG: Creating decoration for window {self.object_id}, width={self.width}"
+            )
             self.decoration.create(self.width)
         elif self.decoration and self.decoration.created:
             # Resize if window width changed
             if self.width != self.decoration.width:
-                print(f"DEBUG: Resizing decoration from {self.decoration.width} to {self.width}")
+                print(
+                    f"DEBUG: Resizing decoration from {self.decoration.width} to {self.width}"
+                )
                 self.decoration.resize(self.width)
 
     def on_render_finish(self, focused: bool = False):
@@ -314,7 +318,9 @@ class Window(ProtocolObject):
             focused: Whether this window is currently focused
         """
         if self.decoration and self.decoration.created:
-            print(f"DEBUG: Rendering decoration for window {self.object_id}, title={self.title}, focused={focused}")
+            print(
+                f"DEBUG: Rendering decoration for window {self.object_id}, title={self.title}, focused={focused}"
+            )
             # Set offset and synchronize with window commit
             self.decoration.set_offset_and_sync()
             # Render the decoration
@@ -380,7 +386,9 @@ class Decoration:
         # Determine position and use appropriate request
         if self.style.position == "top":
             decoration_id = self.connection.allocate_id()
-            payload = MessageEncoder().new_id(decoration_id).object(self.surface).bytes()
+            payload = (
+                MessageEncoder().new_id(decoration_id).object(self.surface).bytes()
+            )
             self.connection.send_message(
                 self.window.object_id,
                 RiverWindowV1.Request.GET_DECORATION_ABOVE,
@@ -388,7 +396,9 @@ class Decoration:
             )
         else:  # bottom
             decoration_id = self.connection.allocate_id()
-            payload = MessageEncoder().new_id(decoration_id).object(self.surface).bytes()
+            payload = (
+                MessageEncoder().new_id(decoration_id).object(self.surface).bytes()
+            )
             self.connection.send_message(
                 self.window.object_id,
                 RiverWindowV1.Request.GET_DECORATION_BELOW,
@@ -403,7 +413,9 @@ class Decoration:
         size = stride * height
 
         self.pool = ShmPool(self.connection, size)
-        self.buffer = self.pool.create_buffer(0, self.width, height, stride, WlShm.FORMAT_ARGB8888)
+        self.buffer = self.pool.create_buffer(
+            0, self.width, height, stride, WlShm.FORMAT_ARGB8888
+        )
 
         self.created = True
 
@@ -486,7 +498,9 @@ class Decoration:
         if self.pool:
             if size > self.pool.size:
                 self.pool.resize(size)
-            self.buffer = self.pool.create_buffer(0, self.width, height, stride, WlShm.FORMAT_ARGB8888)
+            self.buffer = self.pool.create_buffer(
+                0, self.width, height, stride, WlShm.FORMAT_ARGB8888
+            )
 
     def destroy(self):
         """Clean up the decoration."""
@@ -499,7 +513,9 @@ class Decoration:
         if self.decoration_obj:
             payload = b""
             self.connection.send_message(
-                self.decoration_obj.object_id, RiverDecorationV1.Request.DESTROY, payload
+                self.decoration_obj.object_id,
+                RiverDecorationV1.Request.DESTROY,
+                payload,
             )
             self.connection.unregister_object(self.decoration_obj.object_id)
 

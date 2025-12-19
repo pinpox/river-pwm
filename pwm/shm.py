@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from .connection import WaylandConnection
 
 # MFD_CLOEXEC constant (may not be available on all systems)
-MFD_CLOEXEC = getattr(os, 'MFD_CLOEXEC', 0x0001)
+MFD_CLOEXEC = getattr(os, "MFD_CLOEXEC", 0x0001)
 
 
 class ShmPool:
@@ -97,7 +97,10 @@ class ShmPool:
 
         # Create new mapping
         self.mmap = mmap.mmap(
-            self.fd, new_size, flags=mmap.MAP_SHARED, prot=mmap.PROT_READ | mmap.PROT_WRITE
+            self.fd,
+            new_size,
+            flags=mmap.MAP_SHARED,
+            prot=mmap.PROT_READ | mmap.PROT_WRITE,
         )
 
         # Tell wl_shm_pool about the resize

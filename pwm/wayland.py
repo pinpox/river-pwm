@@ -33,9 +33,7 @@ class WlCompositor(ProtocolObject):
         # Send create_surface request
         encoder = MessageEncoder()
         encoder.new_id(surface_id)
-        self.connection.send_message(
-            self.object_id, self.CREATE_SURFACE, encoder.data
-        )
+        self.connection.send_message(self.object_id, self.CREATE_SURFACE, encoder.data)
 
         return surface
 
@@ -118,8 +116,10 @@ class WlShm(ProtocolObject):
         encoder.int32(size)
 
         # Extract FDs from encoder if present
-        fds = getattr(encoder, 'fds', None)
-        self.connection.send_message(self.object_id, self.CREATE_POOL, encoder.data, fds=fds)
+        fds = getattr(encoder, "fds", None)
+        self.connection.send_message(
+            self.object_id, self.CREATE_POOL, encoder.data, fds=fds
+        )
 
         return pool
 

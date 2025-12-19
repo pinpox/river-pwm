@@ -106,9 +106,7 @@ class IPCServer:
             return
 
         # Check for readable sockets
-        readable, _, _ = select.select(
-            [self.server_socket] + self.clients, [], [], 0
-        )
+        readable, _, _ = select.select([self.server_socket] + self.clients, [], [], 0)
 
         for sock in readable:
             if sock == self.server_socket:
@@ -182,7 +180,9 @@ class IPCServer:
             client.close()
         except:
             pass
-        print(f"IPC: Client disconnected (total: {len(self.clients)}, subscribers: {len(self.subscribers)}, was_subscriber: {was_subscriber})")
+        print(
+            f"IPC: Client disconnected (total: {len(self.clients)}, subscribers: {len(self.subscribers)}, was_subscriber: {was_subscriber})"
+        )
 
     def _handle_message(
         self, client: socket.socket, msg_type: int, payload: bytes
@@ -222,7 +222,9 @@ class IPCServer:
                     existing = set(self.subscribers[client])
                     new_events = set(events)
                     self.subscribers[client] = list(existing | new_events)
-                    print(f"IPC: Client added subscriptions {events}, now subscribed to: {self.subscribers[client]}")
+                    print(
+                        f"IPC: Client added subscriptions {events}, now subscribed to: {self.subscribers[client]}"
+                    )
                 else:
                     self.subscribers[client] = events
                     print(f"IPC: Client subscribed to events: {events}")
@@ -233,7 +235,9 @@ class IPCServer:
                 print(f"IPC: RUN_COMMAND request: {command}")
                 return self._run_command(command)
             else:
-                return [{"success": False, "error": f"Unknown message type: {msg_type}"}]
+                return [
+                    {"success": False, "error": f"Unknown message type: {msg_type}"}
+                ]
         except Exception as e:
             print(f"IPC: Error handling message type {msg_type}: {e}")
             return [{"success": False, "error": str(e)}]
@@ -276,6 +280,23 @@ class IPCServer:
         for num in range(1, self.wm.config.num_workspaces + 1):
             ws = self.wm.layout_manager.workspaces.get(output.object_id, {}).get(num)
             is_active = num == active_num
+
+            # Add layout and tab information
+            layout_name = ws.layout.name if ws else "tile-right"
+            tab_info = {}
+            if ws and ws.layout.name == "tabbed":
+                focused_idx = 0
+                if ws.focused_window and ws.focused_window in ws.windows:
+                    focused_idx = ws.windows.index(ws.focused_window)
+
+                tab_info = {
+                    "is_tabbed": True,
+                    "tab_count": len(ws.windows),
+                    "focused_tab_index": focused_idx,
+                }
+            else:
+                tab_info = {"is_tabbed": False}
+
             # Always return all workspaces, even if not yet initialized
             workspaces.append(
                 {
@@ -290,7 +311,13 @@ class IPCServer:
                         "width": output.width,
                         "height": output.height,
                     },
-                    "output": f"output-{output.wl_output_name}" if output.wl_output_name else "unknown",
+                    "output": (
+                        f"output-{output.wl_output_name}"
+                        if output.wl_output_name
+                        else "unknown"
+                    ),
+                    "layout": layout_name,
+                    "tabs": tab_info,
                 }
             )
 
@@ -306,13 +333,15 @@ class IPCServer:
 
         for output in self.wm.manager.outputs.values():
             active_workspace = self.wm.layout_manager.get_active_workspace(output)
-            current_ws = (
-                active_workspace.name if active_workspace else "1"
-            )
+            current_ws = active_workspace.name if active_workspace else "1"
 
             outputs.append(
                 {
-                    "name": f"output-{output.wl_output_name}" if output.wl_output_name else "unknown",
+                    "name": (
+                        f"output-{output.wl_output_name}"
+                        if output.wl_output_name
+                        else "unknown"
+                    ),
                     "active": True,
                     "current_workspace": current_ws,
                     "rect": {
@@ -337,46 +366,64 @@ class IPCServer:
         # Build tree for each output
         for output in self.wm.manager.outputs.values():
             workspace_nodes = []
-            active_num = self.wm.layout_manager.active_workspace.get(output.object_id, 1)
+            active_num = self.wm.layout_manager.active_workspace.get(
+                output.object_id, 1
+            )
 
             # Create nodes for all configured workspaces
             for num in range(1, self.wm.config.num_workspaces + 1):
-                ws = self.wm.layout_manager.workspaces.get(output.object_id, {}).get(num)
-                is_focused = (num == active_num)
+                ws = self.wm.layout_manager.workspaces.get(output.object_id, {}).get(
+                    num
+                )
+                is_focused = num == active_num
 
                 # Get windows for this workspace
                 window_nodes = []
                 if ws:
                     for window in ws.windows:
-                        window_nodes.append({
-                            "id": window.object_id,
-                            "name": window.title or "unknown",
-                            "type": "con",
-                            "focused": window == self.wm.focused_window,
-                        })
+                        window_nodes.append(
+                            {
+                                "id": window.object_id,
+                                "name": window.title or "unknown",
+                                "type": "con",
+                                "focused": window == self.wm.focused_window,
+                            }
+                        )
 
                 # Add workspace node
-                workspace_nodes.append({
-                    "id": 1000 + num,
-                    "num": num,
-                    "name": ws.name if ws else str(num),
-                    "type": "workspace",
-                    "focused": is_focused,
-                    "visible": is_focused,
-                    "urgent": False,
-                    "output": f"output-{output.wl_output_name}" if output.wl_output_name else "unknown",
-                    "nodes": window_nodes,
-                })
+                workspace_nodes.append(
+                    {
+                        "id": 1000 + num,
+                        "num": num,
+                        "name": ws.name if ws else str(num),
+                        "type": "workspace",
+                        "focused": is_focused,
+                        "visible": is_focused,
+                        "urgent": False,
+                        "output": (
+                            f"output-{output.wl_output_name}"
+                            if output.wl_output_name
+                            else "unknown"
+                        ),
+                        "nodes": window_nodes,
+                    }
+                )
 
             # Create output node containing workspaces
-            output_nodes.append({
-                "id": output.object_id,
-                "name": f"output-{output.wl_output_name}" if output.wl_output_name else "unknown",
-                "type": "output",
-                "active": True,
-                "nodes": workspace_nodes,
-                "floating_nodes": [],  # Required by Waybar
-            })
+            output_nodes.append(
+                {
+                    "id": output.object_id,
+                    "name": (
+                        f"output-{output.wl_output_name}"
+                        if output.wl_output_name
+                        else "unknown"
+                    ),
+                    "type": "output",
+                    "active": True,
+                    "nodes": workspace_nodes,
+                    "floating_nodes": [],  # Required by Waybar
+                }
+            )
 
         return {
             "id": 0,
@@ -400,7 +447,7 @@ class IPCServer:
 
         if len(parts) >= 2 and parts[0] == "workspace":
             # Extract workspace number (last part, strip quotes)
-            ws_num_str = parts[-1].strip('"\'')
+            ws_num_str = parts[-1].strip("\"'")
             try:
                 ws_num = int(ws_num_str)
                 if 1 <= ws_num <= self.wm.config.num_workspaces:
@@ -409,9 +456,19 @@ class IPCServer:
                     self.wm._switch_workspace(ws_num)
                     return [{"success": True}]
                 else:
-                    return [{"success": False, "error": f"Invalid workspace number: {ws_num}"}]
+                    return [
+                        {
+                            "success": False,
+                            "error": f"Invalid workspace number: {ws_num}",
+                        }
+                    ]
             except ValueError:
-                return [{"success": False, "error": f"Invalid workspace number: {ws_num_str}"}]
+                return [
+                    {
+                        "success": False,
+                        "error": f"Invalid workspace number: {ws_num_str}",
+                    }
+                ]
 
         # Unknown command
         return [{"success": False, "error": f"Unknown command: {command}"}]
@@ -451,10 +508,14 @@ class IPCServer:
             return
 
         # Count subscribers for this event
-        subscriber_count = sum(1 for subs in self.subscribers.values() if event_name in subs)
+        subscriber_count = sum(
+            1 for subs in self.subscribers.values() if event_name in subs
+        )
         print(f"IPC: Broadcasting {event_name} event to {subscriber_count} subscribers")
         if event_name == "workspace":
-            print(f"IPC: Workspace event: {payload.get('change')} - current={payload.get('current', {}).get('num')}, old={payload.get('old', {}).get('num')}")
+            print(
+                f"IPC: Workspace event: {payload.get('change')} - current={payload.get('current', {}).get('num')}, old={payload.get('old', {}).get('num')}"
+            )
 
         # Send to all subscribed clients
         for client, subscribed_events in list(self.subscribers.items()):

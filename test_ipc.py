@@ -76,7 +76,9 @@ def main():
         msg_type, response = recv_message(sock)
         print(f"Workspaces:")
         for ws in response:
-            status = "FOCUSED" if ws["focused"] else "visible" if ws["visible"] else "hidden"
+            status = (
+                "FOCUSED" if ws["focused"] else "visible" if ws["visible"] else "hidden"
+            )
             print(f"  [{status}] Workspace {ws['num']}: {ws['name']} on {ws['output']}")
 
         # Test GET_OUTPUTS (type 3)
@@ -85,7 +87,9 @@ def main():
         msg_type, response = recv_message(sock)
         print(f"Outputs:")
         for output in response:
-            print(f"  {output['name']}: {output['rect']['width']}x{output['rect']['height']} (workspace: {output['current_workspace']})")
+            print(
+                f"  {output['name']}: {output['rect']['width']}x{output['rect']['height']} (workspace: {output['current_workspace']})"
+            )
 
         # Test SUBSCRIBE (type 2)
         print("\n=== Testing SUBSCRIBE (workspace events) ===")
@@ -116,6 +120,7 @@ def main():
     except Exception as e:
         print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
     finally:
         sock.close()

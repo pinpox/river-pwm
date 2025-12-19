@@ -13,7 +13,7 @@ from enum import Enum, auto
 
 from .manager import WindowManager, ManagerState
 from .objects import Window, Output, Seat, XkbBinding, PointerBinding
-from .layout import (
+from .layouts import (
     LayoutManager,
     LayoutGeometry,
     TilingLayout,
@@ -115,7 +115,7 @@ def parse_color(color: str | Tuple[int, int, int, int]) -> Tuple[int, int, int, 
     """
     if isinstance(color, str):
         # Remove '#' prefix if present
-        color = color.lstrip('#')
+        color = color.lstrip("#")
 
         # Parse RGB or RGBA
         if len(color) == 6:
@@ -134,7 +134,9 @@ def parse_color(color: str | Tuple[int, int, int, int]) -> Tuple[int, int, int, 
     elif isinstance(color, tuple) and len(color) == 4:
         return color
     else:
-        raise ValueError(f"Invalid color type: {type(color)}. Use hex string or RGBA tuple")
+        raise ValueError(
+            f"Invalid color type: {type(color)}. Use hex string or RGBA tuple"
+        )
 
 
 class DecorationPosition(Enum):
@@ -176,14 +178,38 @@ class RiverConfig:
     # Focus follows mouse
     focus_follows_mouse: bool = True
 
+    # Layouts (default to all built-in layouts)
+    layouts: Optional[List] = None
+
     def __post_init__(self):
         """Parse color strings into tuples."""
         self.border_color = parse_color(self.border_color)
         self.focused_border_color = parse_color(self.focused_border_color)
         self.ssd_background_color = parse_color(self.ssd_background_color)
-        self.ssd_focused_background_color = parse_color(self.ssd_focused_background_color)
+        self.ssd_focused_background_color = parse_color(
+            self.ssd_focused_background_color
+        )
         self.ssd_text_color = parse_color(self.ssd_text_color)
         self.ssd_button_color = parse_color(self.ssd_button_color)
+
+    def get_layouts(self):
+        """Get configured layouts or default layouts."""
+        if self.layouts is not None:
+            return self.layouts
+
+        # Default layouts
+        from .layouts import TabbedLayout
+
+        effective_gap = self.gap + (self.border_width * 2)
+        return [
+            TilingLayout(LayoutDirection.HORIZONTAL, gap=effective_gap),
+            TilingLayout(LayoutDirection.VERTICAL, gap=effective_gap),
+            MonocleLayout(gap=effective_gap),
+            TabbedLayout(gap=effective_gap, tab_width=None, border_width=self.border_width),  # Auto-width vertical tabs
+            GridLayout(gap=effective_gap),
+            CenteredMasterLayout(gap=effective_gap),
+            FloatingLayout(),
+        ]
 
 
 class OpType(Enum):
@@ -204,7 +230,10 @@ class RiverWM:
     def __init__(self, config: Optional[RiverConfig] = None):
         self.config = config or RiverConfig()
         self.manager = WindowManager()
-        self.layout_manager = LayoutManager()
+
+        # Create layout manager with configured layouts
+        layouts = self.config.get_layouts()
+        self.layout_manager = LayoutManager(layouts=layouts)
 
         # Configure layout manager
         self.layout_manager.gap = self.config.gap
@@ -217,6 +246,7 @@ class RiverWM:
 
         # IPC server
         from .ipc import IPCServer
+
         self.ipc = IPCServer(self)
         self.manager.ipc_poll_callback = self.ipc.poll
 
@@ -264,7 +294,9 @@ class RiverWM:
         if self.config.use_ssd:
             from .decoration import DecorationStyle
 
-            print(f"DEBUG: Enabling SSD for window {window.object_id}, title={window.title}")
+            print(
+                f"DEBUG: Enabling SSD for window {window.object_id}, title={window.title}"
+            )
             style = DecorationStyle(
                 height=self.config.ssd_height,
                 position=self.config.ssd_position.value,
@@ -552,7 +584,15 @@ class RiverWM:
         """Handle render sequence start."""
         # Position all windows
         if self.focused_output:
+            workspace = self.layout_manager.get_active_workspace(self.focused_output)
+            if not workspace:
+                self.manager.render_finish()
+                return
+
             geometries = self.layout_manager.calculate_layout(self.focused_output)
+
+            # Check if we're in tabbed layout
+            is_tabbed = workspace.layout.name == "tabbed"
 
             # Track z-order
             prev_node = None
@@ -584,42 +624,66 @@ class RiverWM:
                         self._make_border_config(self.config.border_color)
                     )
 
-                # Show window
-                window.show()
+                # Show/hide window based on layout
+                if is_tabbed:
+                    # In tabbed layout, only show focused window
+                    if window == workspace.focused_window:
+                        window.show()
+                    else:
+                        window.hide()
+                else:
+                    # In other layouts, show window
+                    window.show()
 
-                # Initialize/update decorations
+                # Initialize/update window decorations (SSD)
                 if window.use_ssd_enabled:
                     window.on_render_start()
 
+            # Render layout decorations (tab bar, etc.)
+            if workspace.layout.should_render_decorations():
+                # Create decorations if needed
+                if not hasattr(workspace.layout, "_decorations_created"):
+                    from .decoration import DecorationStyle
+
+                    style = DecorationStyle(
+                        height=30,
+                        bg_color=self.config.ssd_background_color,
+                        focused_bg_color=self.config.focused_border_color,  # Use blue border color
+                        text_color=self.config.ssd_text_color,
+                    )
+                    workspace.layout.create_decorations(self.manager.connection, style)
+                    workspace.layout._decorations_created = True
+
+                # Render decorations
+                workspace.layout.render_decorations(
+                    workspace.windows,
+                    workspace.focused_window,
+                    self.focused_output.area,
+                )
+
             # Hide windows not in current workspace
-            workspace = self.layout_manager.get_active_workspace(self.focused_output)
-            if workspace:
-                visible_windows = set(workspace.windows)
-                for window in self.manager.windows.values():
-                    if window not in visible_windows:
-                        window.hide()
+            visible_windows = set(workspace.windows)
+            for window in self.manager.windows.values():
+                if window not in visible_windows:
+                    window.hide()
 
         # Render decorations before finish
         # This must happen BEFORE render_finish to synchronize commits
         for window in self.manager.windows.values():
             if window.use_ssd_enabled and window.is_visible:
-                is_focused = (window == self.focused_window)
+                is_focused = window == self.focused_window
                 window.on_render_finish(focused=is_focused)
 
         # Finish render sequence
         self.manager.render_finish()
 
-    def _make_border_config(
-        self, color: Tuple[int, int, int, int]
-    ) -> BorderConfig:
+    def _make_border_config(self, color: Tuple[int, int, int, int]) -> BorderConfig:
         """Create a border configuration."""
         # Always show borders on all edges
         edges = (
-            WindowEdges.TOP
-            | WindowEdges.BOTTOM
-            | WindowEdges.LEFT
-            | WindowEdges.RIGHT
+            WindowEdges.TOP | WindowEdges.BOTTOM | WindowEdges.LEFT | WindowEdges.RIGHT
         )
+
         # Convert 8-bit color values (0-255) to 32-bit (0-0xFFFFFFFF)
         # River protocol expects 32-bit RGBA values
         def to_32bit(val: int) -> int:
@@ -671,6 +735,10 @@ class RiverWM:
 
         # Toggle fullscreen: Mod+F
         self._bind_key(seat, XKB.f, mod, self._toggle_fullscreen)
+
+        # Tab cycling (for tabbed layout): Alt+Tab, Alt+Shift+Tab
+        self._bind_key(seat, XKB.Tab, mod, self._cycle_tab_forward)
+        self._bind_key(seat, XKB.Tab, mod | Modifiers.SHIFT, self._cycle_tab_backward)
 
         # Workspace bindings: Mod+1-9
         for i in range(1, self.config.num_workspaces + 1):
@@ -804,6 +872,24 @@ class RiverWM:
             self.layout_manager.cycle_layout(self.focused_output, -1)
             self.manager.manage_dirty()
 
+    def _cycle_tab_forward(self):
+        """Cycle to next tab (for tabbed layout)."""
+        if self.focused_output:
+            workspace = self.layout_manager.get_active_workspace(self.focused_output)
+            if workspace:
+                workspace.cycle_tabs_forward()
+                self.focused_window = workspace.focused_window
+                self.manager.manage_dirty()
+
+    def _cycle_tab_backward(self):
+        """Cycle to previous tab (for tabbed layout)."""
+        if self.focused_output:
+            workspace = self.layout_manager.get_active_workspace(self.focused_output)
+            if workspace:
+                workspace.cycle_tabs_backward()
+                self.focused_window = workspace.focused_window
+                self.manager.manage_dirty()
+
     def _toggle_fullscreen(self):
         """Toggle fullscreen for the focused window."""
         if self.focused_window and self.focused_output:
@@ -833,24 +919,31 @@ class RiverWM:
             self.manager.manage_dirty()
 
             # Broadcast workspace event via IPC
-            output_name = f"output-{self.focused_output.wl_output_name}" if self.focused_output.wl_output_name else "unknown"
-            self.ipc.broadcast_event("workspace", {
-                "change": "focus",
-                "current": {
-                    "num": workspace_id,
-                    "name": str(workspace_id),
-                    "visible": True,
-                    "focused": True,
-                    "output": output_name,
+            output_name = (
+                f"output-{self.focused_output.wl_output_name}"
+                if self.focused_output.wl_output_name
+                else "unknown"
+            )
+            self.ipc.broadcast_event(
+                "workspace",
+                {
+                    "change": "focus",
+                    "current": {
+                        "num": workspace_id,
+                        "name": str(workspace_id),
+                        "visible": True,
+                        "focused": True,
+                        "output": output_name,
+                    },
+                    "old": {
+                        "num": old_ws_num,
+                        "name": str(old_ws_num),
+                        "visible": False,
+                        "focused": False,
+                        "output": output_name,
+                    },
                 },
-                "old": {
-                    "num": old_ws_num,
-                    "name": str(old_ws_num),
-                    "visible": False,
-                    "focused": False,
-                    "output": output_name,
-                }
-            })
+            )
 
     def _move_to_workspace(self, workspace_id: int):
         """Move focused window to a workspace."""
@@ -878,7 +971,7 @@ class RiverWM:
             self.ipc.start()
             # Update WAYLAND_DISPLAY to match River's display
             # This ensures spawned programs connect to River, not parent compositor
-            if hasattr(self.manager.connection, 'display_name'):
+            if hasattr(self.manager.connection, "display_name"):
                 wayland_display = self.manager.connection.display_name
                 os.environ["WAYLAND_DISPLAY"] = wayland_display
                 print(f"IPC server listening on {self.ipc.socket_path}")

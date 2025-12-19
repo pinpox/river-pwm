@@ -55,7 +55,7 @@ from .objects import (
 
 from .manager import WindowManager, ManagerState
 
-from .layout import (
+from .layouts import (
     Layout,
     LayoutGeometry,
     LayoutDirection,
@@ -64,6 +64,7 @@ from .layout import (
     GridLayout,
     FloatingLayout,
     CenteredMasterLayout,
+    TabbedLayout,
     Workspace,
     LayoutManager,
 )
@@ -112,6 +113,7 @@ __all__ = [
     "GridLayout",
     "FloatingLayout",
     "CenteredMasterLayout",
+    "TabbedLayout",
     "Workspace",
     "LayoutManager",
     # Window Manager
