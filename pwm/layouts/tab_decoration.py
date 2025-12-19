@@ -71,7 +71,9 @@ class TabDecoration:
         # Ensure all windows have decorations
         for window in windows:
             if window.object_id not in self.window_decorations:
-                print(f"TabDecoration: Creating decoration for window {window.object_id}")
+                print(
+                    f"TabDecoration: Creating decoration for window {window.object_id}"
+                )
                 self._create_decoration_for_window(window, self.width, self.height)
 
         # Remove decorations for windows no longer in list
@@ -125,7 +127,9 @@ class TabDecoration:
             else:
                 # Position on top: X=0 keeps it centered, negative Y moves it up
                 # Add border_width to move to outer top edge
-                offset_payload = MessageEncoder().int32(0).int32(-height - self.border_width).bytes()
+                offset_payload = (
+                    MessageEncoder().int32(0).int32(-height - self.border_width).bytes()
+                )
 
             self.connection.send_message(
                 decoration_id,
@@ -157,10 +161,15 @@ class TabDecoration:
             }
 
         except Exception as e:
-            print(f"TabDecoration: Error creating decoration for window {window.object_id}: {e}")
+            print(
+                f"TabDecoration: Error creating decoration for window {window.object_id}: {e}"
+            )
 
     def _render_and_commit_window(
-        self, window: "Window", all_windows: List["Window"], focused_window: Optional["Window"]
+        self,
+        window: "Window",
+        all_windows: List["Window"],
+        focused_window: Optional["Window"],
     ):
         """Render tabs for a specific window's decoration."""
         dec = self.window_decorations.get(window.object_id)
@@ -217,7 +226,11 @@ class TabDecoration:
             print(f"TabDecoration: Error rendering tabs: {e}")
 
     def _render_horizontal_tabs(
-        self, ctx, width: int, windows: List["Window"], focused_window: Optional["Window"]
+        self,
+        ctx,
+        width: int,
+        windows: List["Window"],
+        focused_window: Optional["Window"],
     ):
         """Render horizontal tabs."""
         num_tabs = len(windows)
@@ -280,7 +293,11 @@ class TabDecoration:
             ctx.show_text(title)
 
     def _render_vertical_tabs(
-        self, ctx, width: int, windows: List["Window"], focused_window: Optional["Window"]
+        self,
+        ctx,
+        width: int,
+        windows: List["Window"],
+        focused_window: Optional["Window"],
     ):
         """Render vertical tabs with rotated text."""
         import math
@@ -391,9 +408,9 @@ class TabDecoration:
                 # Destroy decoration BEFORE surface (it's the role object)
                 # Send the river_decoration_v1.destroy request
                 from ..protocol import RiverDecorationV1
+
                 self.connection.send_message(
-                    dec["decoration"].object_id,
-                    RiverDecorationV1.Request.DESTROY
+                    dec["decoration"].object_id, RiverDecorationV1.Request.DESTROY
                 )
                 dec["decoration"].destroy()
         except Exception as e:
@@ -420,6 +437,8 @@ class TabDecoration:
 
     def cleanup(self):
         """Clean up all resources."""
-        print(f"TabDecoration: Cleaning up all decorations ({len(self.window_decorations)} windows)")
+        print(
+            f"TabDecoration: Cleaning up all decorations ({len(self.window_decorations)} windows)"
+        )
         for window_id in list(self.window_decorations.keys()):
             self._cleanup_window_decoration(window_id)

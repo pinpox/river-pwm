@@ -205,7 +205,9 @@ class RiverConfig:
             TilingLayout(LayoutDirection.HORIZONTAL, gap=effective_gap),
             TilingLayout(LayoutDirection.VERTICAL, gap=effective_gap),
             MonocleLayout(gap=effective_gap),
-            TabbedLayout(gap=effective_gap, tab_width=None, border_width=self.border_width),  # Auto-width vertical tabs
+            TabbedLayout(
+                gap=effective_gap, tab_width=None, border_width=self.border_width
+            ),  # Auto-width vertical tabs
             GridLayout(gap=effective_gap),
             CenteredMasterLayout(gap=effective_gap),
             FloatingLayout(),

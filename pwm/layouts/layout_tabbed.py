@@ -43,7 +43,9 @@ class TabbedLayout(Layout):
         ctx = cairo.Context(temp_surface)
 
         # Set font to match rendering settings
-        ctx.select_font_face("sans-serif", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        ctx.select_font_face(
+            "sans-serif", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL
+        )
         ctx.set_font_size(12)
 
         # Measure font metrics - font_extents returns (ascent, descent, height, max_x_advance, max_y_advance)
@@ -99,8 +101,12 @@ class TabbedLayout(Layout):
         from .tab_decoration import TabDecoration
 
         self.tab_decoration = TabDecoration(
-            connection, style, self.tab_width, orientation="vertical",
-            gap=self.gap, border_width=self.border_width
+            connection,
+            style,
+            self.tab_width,
+            orientation="vertical",
+            gap=self.gap,
+            border_width=self.border_width,
         )
 
     def render_decorations(self, windows, focused_window, area):
