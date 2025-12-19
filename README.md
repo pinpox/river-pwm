@@ -2,6 +2,13 @@
 
 A tiling window manager for the River Wayland compositor, written in Python.
 
+<img width="1280" height="718" alt="image" src="https://github.com/user-attachments/assets/42eb1085-5b4c-4a63-be5a-8370735ccf30" />
+
+---
+
+<img width="1280" height="718" alt="image" src="https://github.com/user-attachments/assets/da088c94-4e7d-48d6-9010-1b8c414c89c8" />
+
+
 ## Features
 
 - **Multiple Layouts**: Tiling (horizontal/vertical), grid, monocle, centered-master, floating
