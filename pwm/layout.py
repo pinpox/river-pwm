@@ -562,20 +562,22 @@ class LayoutManager:
             {}
         )  # window_id -> (output_id, workspace_id)
 
-        # Available layouts
-        self.layouts: List[Layout] = [
-            TilingLayout(LayoutDirection.HORIZONTAL),
-            TilingLayout(LayoutDirection.VERTICAL),
-            MonocleLayout(),
-            GridLayout(),
-            CenteredMasterLayout(),
-            FloatingLayout(),
-        ]
-
         # Configuration
         self.num_workspaces = 9
         self.gap = 4
         self.border_width = 2
+
+        # Available layouts - gap accounts for borders
+        # effective_gap ensures visual gap between borders equals configured gap
+        effective_gap = self.gap + (self.border_width * 2)
+        self.layouts: List[Layout] = [
+            TilingLayout(LayoutDirection.HORIZONTAL, gap=effective_gap),
+            TilingLayout(LayoutDirection.VERTICAL, gap=effective_gap),
+            MonocleLayout(gap=effective_gap),
+            GridLayout(gap=effective_gap),
+            CenteredMasterLayout(gap=effective_gap),
+            FloatingLayout(),
+        ]
         self.border_color = BorderConfig(
             edges=WindowEdges.TOP
             | WindowEdges.BOTTOM
@@ -603,9 +605,11 @@ class LayoutManager:
         """Add an output to manage."""
         self.outputs[output.object_id] = output
         self.workspaces[output.object_id] = {}
+        # effective_gap ensures visual gap between borders equals configured gap
+        effective_gap = self.gap + (self.border_width * 2)
         for i in range(1, self.num_workspaces + 1):
             self.workspaces[output.object_id][i] = Workspace(
-                name=str(i), layout=TilingLayout(gap=self.gap)
+                name=str(i), layout=TilingLayout(gap=effective_gap)
             )
         self.active_workspace[output.object_id] = 1
 

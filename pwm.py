@@ -17,8 +17,8 @@ config = RiverConfig(
     launcher=os.getenv("PWM_LAUNCHER", "fuzzel"),
 
     # Layout settings
-    gap=4,
-    border_width=2,
+    gap=10,
+    border_width=5,
 
     # Colors (hex format: #RRGGBB or #RRGGBBAA)
     border_color="#4c4c4c",           # Gray

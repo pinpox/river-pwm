@@ -23,6 +23,7 @@ class DecorationStyle:
     button_color: Tuple[int, int, int, int] = (94, 129, 172, 255)
     font_family: str = "sans-serif"
     font_size: int = 11
+    border_width: int = 2  # Window border width (decoration should extend over borders)
 
 
 class DecorationRenderer:

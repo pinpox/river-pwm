@@ -16,7 +16,6 @@ A tiling window manager for the River Wayland compositor, written in Python.
 - **Key Bindings**: Configurable keyboard shortcuts
 - **Multi-Output**: Full support for multiple monitors
 - **Borders**: Configurable window borders with focus indication
-- **Pure Python**: No external dependencies, only Python standard library
 
 ## Requirements
 

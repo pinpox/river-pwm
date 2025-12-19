@@ -67,6 +67,9 @@ class WindowManager:
 
         # State
         self.state = ManagerState.IDLE
+
+        # IPC callback (set by RiverWM)
+        self.ipc_poll_callback: Optional[Callable[[], None]] = None
         self.session_locked = False
         self.running = False
         self.unavailable = False
@@ -372,6 +375,10 @@ class WindowManager:
 
             # Dispatch any received events
             self._dispatch_events()
+
+            # Poll IPC server if callback is set
+            if self.ipc_poll_callback:
+                self.ipc_poll_callback()
 
     def _dispatch_events(self):
         """Dispatch all received events."""

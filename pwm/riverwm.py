@@ -215,6 +215,11 @@ class RiverWM:
         self.focused_window: Optional[Window] = None
         self.focused_output: Optional[Output] = None
 
+        # IPC server
+        from .ipc import IPCServer
+        self.ipc = IPCServer(self)
+        self.manager.ipc_poll_callback = self.ipc.poll
+
         # Interactive operations
         self.op_type = OpType.NONE
         self.op_window: Optional[Window] = None
@@ -263,10 +268,11 @@ class RiverWM:
             style = DecorationStyle(
                 height=self.config.ssd_height,
                 position=self.config.ssd_position.value,
-                bg_color=self.config.ssd_background_color,
-                focused_bg_color=self.config.ssd_focused_background_color,
+                bg_color=self.config.border_color,
+                focused_bg_color=self.config.focused_border_color,
                 text_color=self.config.ssd_text_color,
                 button_color=self.config.ssd_button_color,
+                border_width=self.config.border_width,
             )
             window.enable_ssd(style)
 
@@ -531,6 +537,11 @@ class RiverWM:
                 # Ensure dimensions are positive
                 width = max(1, geom.width)
                 height = max(1, geom.height)
+
+                # Adjust height for decorations if enabled
+                if window.use_ssd_enabled:
+                    height = max(1, height - self.config.ssd_height)
+
                 window.propose_dimensions(width, height)
                 window.set_tiled(geom.tiled_edges)
 
@@ -547,7 +558,13 @@ class RiverWM:
             prev_node = None
             for window, geom in geometries.items():
                 node = window.get_node()
-                node.set_position(geom.x, geom.y)
+
+                # Adjust position for top decorations
+                y = geom.y
+                if window.use_ssd_enabled and self.config.ssd_position.value == "top":
+                    y = geom.y + self.config.ssd_height
+
+                node.set_position(geom.x, y)
 
                 # Stack windows
                 if prev_node:
@@ -586,7 +603,8 @@ class RiverWM:
         # This must happen BEFORE render_finish to synchronize commits
         for window in self.manager.windows.values():
             if window.use_ssd_enabled and window.is_visible:
-                window.on_render_finish()
+                is_focused = (window == self.focused_window)
+                window.on_render_finish(focused=is_focused)
 
         # Finish render sequence
         self.manager.render_finish()
@@ -797,11 +815,36 @@ class RiverWM:
     def _switch_workspace(self, workspace_id: int):
         """Switch to a workspace."""
         if self.focused_output:
+            # Get old workspace for event
+            old_ws_num = self.layout_manager.active_workspace.get(
+                self.focused_output.object_id, 1
+            )
+
+            # Switch workspace
             self.layout_manager.switch_workspace(self.focused_output, workspace_id)
             workspace = self.layout_manager.get_active_workspace(self.focused_output)
             if workspace:
                 self.focused_window = workspace.focused_window
             self.manager.manage_dirty()
+
+            # Broadcast workspace event via IPC
+            self.ipc.broadcast_event("workspace", {
+                "change": "focus",
+                "current": {
+                    "num": workspace_id,
+                    "name": str(workspace_id),
+                    "visible": True,
+                    "focused": True,
+                    "output": self.focused_output.wl_output_name or "unknown",
+                },
+                "old": {
+                    "num": old_ws_num,
+                    "name": str(old_ws_num),
+                    "visible": False,
+                    "focused": False,
+                    "output": self.focused_output.wl_output_name or "unknown",
+                }
+            })
 
     def _move_to_workspace(self, workspace_id: int):
         """Move focused window to a workspace."""
@@ -824,6 +867,12 @@ class RiverWM:
             print("Failed to connect to River compositor")
             return 1
 
+        # Start IPC server
+        try:
+            self.ipc.start()
+        except Exception as e:
+            print(f"Warning: Failed to start IPC server: {e}")
+
         print("River Window Manager started")
         print(f"  Mod key: Alt")
         print(f"  Terminal: {self.config.terminal}")
@@ -834,6 +883,7 @@ class RiverWM:
         except KeyboardInterrupt:
             pass
         finally:
+            self.ipc.stop()
             self.manager.disconnect()
 
         return 0

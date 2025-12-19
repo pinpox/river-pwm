@@ -307,16 +307,20 @@ class Window(ProtocolObject):
                 print(f"DEBUG: Resizing decoration from {self.decoration.width} to {self.width}")
                 self.decoration.resize(self.width)
 
-    def on_render_finish(self):
-        """Called during render to commit decoration."""
+    def on_render_finish(self, focused: bool = False):
+        """Called during render to commit decoration.
+
+        Args:
+            focused: Whether this window is currently focused
+        """
         if self.decoration and self.decoration.created:
-            print(f"DEBUG: Rendering decoration for window {self.object_id}, title={self.title}")
+            print(f"DEBUG: Rendering decoration for window {self.object_id}, title={self.title}, focused={focused}")
             # Set offset and synchronize with window commit
             self.decoration.set_offset_and_sync()
             # Render the decoration
             self.decoration.render(
                 self.title or "Untitled",
-                focused=False,  # TODO: track focus state
+                focused=focused,
                 maximized=(self.state == WindowState.MAXIMIZED),
             )
 
@@ -359,12 +363,13 @@ class Decoration:
         """Create the decoration surface and buffers.
 
         Args:
-            window_width: Width of the parent window
+            window_width: Width of the parent window content (excluding borders)
         """
         from .wayland import WlCompositor
         from .shm import ShmPool, WlShm
 
-        self.width = window_width
+        # Decoration width should extend over borders on both sides
+        self.width = window_width + (self.style.border_width * 2)
         height = self.style.height
 
         # Create wl_surface
@@ -393,12 +398,12 @@ class Decoration:
         self.decoration_obj = ProtocolObject(decoration_id, RiverDecorationV1.INTERFACE)
         self.connection.register_object(self.decoration_obj)
 
-        # Create shared memory pool and buffer
-        stride = window_width * 4  # ARGB32 = 4 bytes per pixel
+        # Create shared memory pool and buffer with full decoration width
+        stride = self.width * 4  # ARGB32 = 4 bytes per pixel
         size = stride * height
 
         self.pool = ShmPool(self.connection, size)
-        self.buffer = self.pool.create_buffer(0, window_width, height, stride, WlShm.FORMAT_ARGB8888)
+        self.buffer = self.pool.create_buffer(0, self.width, height, stride, WlShm.FORMAT_ARGB8888)
 
         self.created = True
 
@@ -434,12 +439,14 @@ class Decoration:
             return
 
         # Calculate offset based on position
+        # X offset: negative border_width to align with left edge of border
+        # Y offset: depends on position (top or bottom)
         if self.style.position == "top":
             # Top decoration: negative Y offset (above window)
-            x, y = 0, -self.style.height
+            x, y = -self.style.border_width, -self.style.height
         else:
             # Bottom decoration: positive Y offset (below window)
-            x, y = 0, self.window.height
+            x, y = -self.style.border_width, self.window.height
 
         # Send set_offset request
         payload = MessageEncoder().int32(x).int32(y).bytes()
@@ -458,25 +465,28 @@ class Decoration:
         """Resize the decoration buffers.
 
         Args:
-            new_width: New width in pixels
+            new_width: New window content width (excluding borders)
         """
         if not self.created:
             return
 
-        from .shm import ShmPool
         from .wayland import WlShm
 
-        self.width = new_width
+        # Decoration width should extend over borders on both sides
+        self.width = new_width + (self.style.border_width * 2)
         height = self.style.height
-        stride = new_width * 4
+        stride = self.width * 4
         size = stride * height
 
-        # Recreate pool and buffer
-        if self.pool:
-            self.pool.destroy()
+        # Destroy old buffer
+        if self.buffer:
+            self.buffer.destroy_request()
 
-        self.pool = ShmPool(self.connection, size)
-        self.buffer = self.pool.create_buffer(0, new_width, height, stride, WlShm.FORMAT_ARGB8888)
+        # Only resize pool if growing (shrinking is forbidden by Wayland protocol)
+        if self.pool:
+            if size > self.pool.size:
+                self.pool.resize(size)
+            self.buffer = self.pool.create_buffer(0, self.width, height, stride, WlShm.FORMAT_ARGB8888)
 
     def destroy(self):
         """Clean up the decoration."""
