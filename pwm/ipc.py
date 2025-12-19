@@ -229,8 +229,9 @@ class IPCServer:
                 print(f"IPC: Total subscribers now: {len(self.subscribers)}")
                 return {"success": True}
             elif msg_type == MessageType.RUN_COMMAND:
-                # TODO: Implement command execution
-                return [{"success": False, "error": "RUN_COMMAND not yet implemented"}]
+                command = payload.decode("utf-8").strip()
+                print(f"IPC: RUN_COMMAND request: {command}")
+                return self._run_command(command)
             else:
                 return [{"success": False, "error": f"Unknown message type: {msg_type}"}]
         except Exception as e:
@@ -383,6 +384,37 @@ class IPCServer:
             "type": "root",
             "nodes": output_nodes,
         }
+
+    def _run_command(self, command: str) -> List[Dict[str, Any]]:
+        """Execute a command.
+
+        Args:
+            command: Command string to execute
+
+        Returns:
+            List with command result
+        """
+        # Parse workspace switching commands
+        # Waybar sends: workspace "X" or workspace X or workspace number X
+        parts = command.split()
+
+        if len(parts) >= 2 and parts[0] == "workspace":
+            # Extract workspace number (last part, strip quotes)
+            ws_num_str = parts[-1].strip('"\'')
+            try:
+                ws_num = int(ws_num_str)
+                if 1 <= ws_num <= self.wm.config.num_workspaces:
+                    # Switch to workspace
+                    print(f"IPC: Switching to workspace {ws_num}")
+                    self.wm._switch_workspace(ws_num)
+                    return [{"success": True}]
+                else:
+                    return [{"success": False, "error": f"Invalid workspace number: {ws_num}"}]
+            except ValueError:
+                return [{"success": False, "error": f"Invalid workspace number: {ws_num_str}"}]
+
+        # Unknown command
+        return [{"success": False, "error": f"Unknown command: {command}"}]
 
     def _get_version(self) -> Dict[str, Any]:
         """Get version info in i3 format.
