@@ -79,6 +79,9 @@ class WaylandConnection:
         if display_name is None:
             display_name = os.environ.get("WAYLAND_DISPLAY", "wayland-0")
 
+        # Save the display name for later use
+        self.display_name = display_name
+
         # Try XDG_RUNTIME_DIR first
         runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
         if runtime_dir:

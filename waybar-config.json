@@ -1,0 +1,125 @@
+[
+  {
+    "layer": "top",
+    "position": "bottom",
+    "spacing": 4,
+    "modules-left": [
+      "sway/workspaces",
+      "sway/mode"
+    ],
+    "modules-center": [
+      "custom/mic",
+      "mpris"
+    ],
+    "modules-right": [
+      "tray",
+      "custom/notification",
+      "network",
+      "pulseaudio",
+      "battery",
+      "clock"
+    ],
+    "sway/workspaces": {
+      "all-outputs": true
+    },
+    "battery": {
+      "format": "{capacity}% {icon}",
+      "format-alt": "{time} {icon}",
+      "format-charging": "{capacity}% ",
+      "format-full": "{capacity}% {icon}",
+      "format-good": "{capacity}% {icon}",
+      "format-icons": [
+        " ",
+        " ",
+        " ",
+        " ",
+        " "
+      ],
+      "format-plugged": "{capacity}% ",
+      "states": {
+        "critical": 15,
+        "good": 95,
+        "warning": 30
+      }
+    },
+    "clock": {
+      "format-alt": "{:%Y-%m-%d}",
+      "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+    },
+    "custom/mic": {
+      "exec": "/nix/store/hnjymz06n5mblqk4bwkcn91l94ksgpj4-mic-status-apps/bin/mic-status-apps",
+      "exec-if": "/nix/store/amc2xqflkx50rwzm7b2mk5vypmsxq87i-mic-exec-if/bin/mic-exec-if",
+      "format": "{}",
+      "interval": 1,
+      "on-click": "/nix/store/1f4p79gmqxvw0nfk832nv9cjap93xll8-mic-toggle/bin/mic-toggle",
+      "tooltip": false
+    },
+    "custom/notification": {
+      "escape": true,
+      "exec": "swaync-client -swb",
+      "exec-if": "which swaync-client",
+      "format": "{} {icon}",
+      "format-icons": {
+        "dnd-inhibited-none": "",
+        "dnd-inhibited-notification": "<span foreground='red'><sup></sup></span>",
+        "dnd-none": "",
+        "dnd-notification": "<span foreground='red'><sup></sup></span>",
+        "inhibited-none": "",
+        "inhibited-notification": "<span foreground='red'><sup></sup></span>",
+        "none": "",
+        "notification": "<span foreground='red'><sup></sup></span>"
+      },
+      "on-click": "swaync-client -t -sw",
+      "on-click-right": "swaync-client -d -sw",
+      "return-type": "json",
+      "tooltip": false
+    },
+    "idle_inhibitor": {
+      "format": "{icon}",
+      "format-icons": {
+        "activated": " ",
+        "deactivated": " "
+      }
+    },
+    "mpris": {
+      "format": "{player_icon} {artist} - {title}",
+      "ignored-players": [
+        "firefox",
+        "chromium"
+      ],
+      "player-icons": {
+        "default": "🎵",
+        "strawberry": "🍓"
+      }
+    },
+    "network": {
+      "format-alt": "{ifname}: {ipaddr}/{cidr}",
+      "format-disconnected": "Disconnected ⚠",
+      "format-ethernet": "{ipaddr}/{cidr} ",
+      "format-linked": "{ifname} (No IP) ",
+      "format-wifi": "{essid} ({signalStrength}%)  ",
+      "tooltip-format": "{ifname} via {gwaddr} "
+    },
+    "pulseaudio": {
+      "format": "{volume}% {icon} {format_source}",
+      "format-bluetooth": "{volume}% {icon} {format_source}",
+      "format-bluetooth-muted": "ﱝ {icon} {format_source}",
+      "format-icons": {
+        "default": [
+          "",
+          "",
+          ""
+        ],
+        "headphone": ""
+      },
+      "format-muted": "ﱝ {format_source}",
+      "format-source": "{volume}% ",
+      "format-source-muted": "",
+      "on-click": "/nix/store/1f4p79gmqxvw0nfk832nv9cjap93xll8-mic-toggle/bin/mic-toggle",
+      "scroll-step": 1
+    },
+    "tray": {
+      "spacing": 10
+    }
+  }
+]

@@ -735,12 +735,17 @@ class RiverWM:
     def _spawn(self, command: str):
         """Spawn a program."""
         try:
+            # Get current WAYLAND_DISPLAY from environment
+            # This ensures spawned programs connect to River, not parent compositor
+            env = os.environ.copy()
+
             subprocess.Popen(
                 command,
                 shell=True,
                 start_new_session=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                env=env,
             )
         except Exception as e:
             print(f"Failed to spawn {command}: {e}")
@@ -828,6 +833,7 @@ class RiverWM:
             self.manager.manage_dirty()
 
             # Broadcast workspace event via IPC
+            output_name = f"output-{self.focused_output.wl_output_name}" if self.focused_output.wl_output_name else "unknown"
             self.ipc.broadcast_event("workspace", {
                 "change": "focus",
                 "current": {
@@ -835,14 +841,14 @@ class RiverWM:
                     "name": str(workspace_id),
                     "visible": True,
                     "focused": True,
-                    "output": self.focused_output.wl_output_name or "unknown",
+                    "output": output_name,
                 },
                 "old": {
                     "num": old_ws_num,
                     "name": str(old_ws_num),
                     "visible": False,
                     "focused": False,
-                    "output": self.focused_output.wl_output_name or "unknown",
+                    "output": output_name,
                 }
             })
 
@@ -870,6 +876,21 @@ class RiverWM:
         # Start IPC server
         try:
             self.ipc.start()
+            # Update WAYLAND_DISPLAY to match River's display
+            # This ensures spawned programs connect to River, not parent compositor
+            if hasattr(self.manager.connection, 'display_name'):
+                wayland_display = self.manager.connection.display_name
+                os.environ["WAYLAND_DISPLAY"] = wayland_display
+                print(f"IPC server listening on {self.ipc.socket_path}")
+                print(f"Updated WAYLAND_DISPLAY={wayland_display}")
+            else:
+                print(f"IPC server listening on {self.ipc.socket_path}")
+
+            # Set I3SOCK/SWAYSOCK so i3/sway-compatible tools (like Waybar) use pwm's IPC
+            socket_path = str(self.ipc.socket_path)
+            os.environ["I3SOCK"] = socket_path
+            os.environ["SWAYSOCK"] = socket_path
+            print(f"Set I3SOCK/SWAYSOCK={socket_path}")
         except Exception as e:
             print(f"Warning: Failed to start IPC server: {e}")
 

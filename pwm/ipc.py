@@ -173,6 +173,7 @@ class IPCServer:
         Args:
             client: Client socket to remove
         """
+        was_subscriber = client in self.subscribers
         if client in self.clients:
             self.clients.remove(client)
         if client in self.subscribers:
@@ -181,7 +182,7 @@ class IPCServer:
             client.close()
         except:
             pass
-        print(f"IPC: Client disconnected (total: {len(self.clients)})")
+        print(f"IPC: Client disconnected (total: {len(self.clients)}, subscribers: {len(self.subscribers)}, was_subscriber: {was_subscriber})")
 
     def _handle_message(
         self, client: socket.socket, msg_type: int, payload: bytes
@@ -196,19 +197,36 @@ class IPCServer:
         Returns:
             Response data (will be JSON encoded)
         """
+        print(f"IPC: Received message type {msg_type}")
         try:
             if msg_type == MessageType.GET_WORKSPACES:
-                return self._get_workspaces()
+                print(f"IPC: GET_WORKSPACES request")
+                result = self._get_workspaces()
+                print(f"IPC: Returning {len(result)} workspaces")
+                return result
             elif msg_type == MessageType.GET_OUTPUTS:
+                print(f"IPC: GET_OUTPUTS request")
                 return self._get_outputs()
             elif msg_type == MessageType.GET_VERSION:
                 return self._get_version()
             elif msg_type == MessageType.GET_TREE:
-                return self._get_tree()
+                print(f"IPC: GET_TREE request")
+                result = self._get_tree()
+                print(f"IPC: Returning tree with {len(result.get('nodes', []))} nodes")
+                return result
             elif msg_type == MessageType.SUBSCRIBE:
                 events = json.loads(payload.decode("utf-8"))
-                self.subscribers[client] = events
-                print(f"IPC: Client subscribed to events: {events}")
+                # Add to existing subscriptions rather than replacing
+                if client in self.subscribers:
+                    # Merge with existing subscriptions
+                    existing = set(self.subscribers[client])
+                    new_events = set(events)
+                    self.subscribers[client] = list(existing | new_events)
+                    print(f"IPC: Client added subscriptions {events}, now subscribed to: {self.subscribers[client]}")
+                else:
+                    self.subscribers[client] = events
+                    print(f"IPC: Client subscribed to events: {events}")
+                print(f"IPC: Total subscribers now: {len(self.subscribers)}")
                 return {"success": True}
             elif msg_type == MessageType.RUN_COMMAND:
                 # TODO: Implement command execution
@@ -256,24 +274,24 @@ class IPCServer:
 
         for num in range(1, self.wm.config.num_workspaces + 1):
             ws = self.wm.layout_manager.workspaces.get(output.object_id, {}).get(num)
-            if ws:
-                is_active = num == active_num
-                workspaces.append(
-                    {
-                        "num": num,
-                        "name": ws.name,
-                        "visible": is_active,
-                        "focused": is_active,
-                        "urgent": False,
-                        "rect": {
-                            "x": output.x,
-                            "y": output.y,
-                            "width": output.width,
-                            "height": output.height,
-                        },
-                        "output": output.wl_output_name or "unknown",
-                    }
-                )
+            is_active = num == active_num
+            # Always return all workspaces, even if not yet initialized
+            workspaces.append(
+                {
+                    "num": num,
+                    "name": ws.name if ws else str(num),
+                    "visible": is_active,
+                    "focused": is_active,
+                    "urgent": False,
+                    "rect": {
+                        "x": output.x,
+                        "y": output.y,
+                        "width": output.width,
+                        "height": output.height,
+                    },
+                    "output": f"output-{output.wl_output_name}" if output.wl_output_name else "unknown",
+                }
+            )
 
         return workspaces
 
@@ -293,7 +311,7 @@ class IPCServer:
 
             outputs.append(
                 {
-                    "name": output.wl_output_name or "unknown",
+                    "name": f"output-{output.wl_output_name}" if output.wl_output_name else "unknown",
                     "active": True,
                     "current_workspace": current_ws,
                     "rect": {
@@ -308,47 +326,62 @@ class IPCServer:
         return outputs
 
     def _get_tree(self) -> Dict[str, Any]:
-        """Get window tree in i3 format.
+        """Get window tree in i3/Sway format with outputs and workspaces.
 
         Returns:
-            Tree dictionary
+            Tree dictionary matching Sway's structure
         """
-        # Simplified tree structure - just list windows
-        windows = []
+        output_nodes = []
 
-        for window in self.wm.manager.windows.values():
-            if window.is_visible:
-                windows.append(
-                    {
-                        "id": window.object_id,
-                        "name": window.title or "unknown",
-                        "type": "con",
-                        "focused": window == self.wm.focused_window,
-                        "rect": {
-                            "x": window.node.x if window.node else 0,
-                            "y": window.node.y if window.node else 0,
-                            "width": window.width,
-                            "height": window.height,
-                        },
-                        "window_properties": {
-                            "title": window.title,
-                            "class": window.app_id,
-                        },
-                    }
-                )
+        # Build tree for each output
+        for output in self.wm.manager.outputs.values():
+            workspace_nodes = []
+            active_num = self.wm.layout_manager.active_workspace.get(output.object_id, 1)
+
+            # Create nodes for all configured workspaces
+            for num in range(1, self.wm.config.num_workspaces + 1):
+                ws = self.wm.layout_manager.workspaces.get(output.object_id, {}).get(num)
+                is_focused = (num == active_num)
+
+                # Get windows for this workspace
+                window_nodes = []
+                if ws:
+                    for window in ws.windows:
+                        window_nodes.append({
+                            "id": window.object_id,
+                            "name": window.title or "unknown",
+                            "type": "con",
+                            "focused": window == self.wm.focused_window,
+                        })
+
+                # Add workspace node
+                workspace_nodes.append({
+                    "id": 1000 + num,
+                    "num": num,
+                    "name": ws.name if ws else str(num),
+                    "type": "workspace",
+                    "focused": is_focused,
+                    "visible": is_focused,
+                    "urgent": False,
+                    "output": f"output-{output.wl_output_name}" if output.wl_output_name else "unknown",
+                    "nodes": window_nodes,
+                })
+
+            # Create output node containing workspaces
+            output_nodes.append({
+                "id": output.object_id,
+                "name": f"output-{output.wl_output_name}" if output.wl_output_name else "unknown",
+                "type": "output",
+                "active": True,
+                "nodes": workspace_nodes,
+                "floating_nodes": [],  # Required by Waybar
+            })
 
         return {
             "id": 0,
             "name": "root",
             "type": "root",
-            "nodes": [
-                {
-                    "id": 1,
-                    "name": "workspace",
-                    "type": "workspace",
-                    "nodes": windows,
-                }
-            ],
+            "nodes": output_nodes,
         }
 
     def _get_version(self) -> Dict[str, Any]:
@@ -384,6 +417,12 @@ class IPCServer:
         if not event_type:
             print(f"IPC: Unknown event type: {event_name}")
             return
+
+        # Count subscribers for this event
+        subscriber_count = sum(1 for subs in self.subscribers.values() if event_name in subs)
+        print(f"IPC: Broadcasting {event_name} event to {subscriber_count} subscribers")
+        if event_name == "workspace":
+            print(f"IPC: Workspace event: {payload.get('change')} - current={payload.get('current', {}).get('num')}, old={payload.get('old', {}).get('num')}")
 
         # Send to all subscribed clients
         for client, subscribed_events in list(self.subscribers.items()):
