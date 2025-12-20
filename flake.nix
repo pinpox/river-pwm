@@ -66,7 +66,10 @@
 
             format = "setuptools";
 
-            propagatedBuildInputs = [ pkgs.python3Packages.pycairo ];
+            propagatedBuildInputs = [
+              pkgs.python3Packages.pycairo
+              pkgs.python3Packages.pypubsub
+            ];
 
             meta = {
               description = "Python library for River window management protocol";
@@ -226,6 +229,7 @@
             buildInputs = [
               pkgs.python3Packages.pytest
               pkgs.python3Packages.pycairo
+              pkgs.python3Packages.pypubsub
               self.packages.${system}.pwm-lib
             ];
           };
@@ -249,6 +253,7 @@
             nativeBuildInputs = [
               pkgs.python3Packages.pytest
               pkgs.python3Packages.pycairo
+              pkgs.python3Packages.pypubsub
               self.packages.${system}.pwm-lib
             ];
 

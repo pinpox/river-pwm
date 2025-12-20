@@ -74,6 +74,73 @@ class IPCServer:
         # Map client socket to list of subscribed event type names
         self.subscribers: Dict[socket.socket, List[str]] = {}
 
+        # Subscribe to window manager events for IPC broadcasting
+        self._setup_event_subscriptions()
+
+    def _setup_event_subscriptions(self):
+        """Subscribe to window manager events for IPC broadcasting.
+
+        When window manager events occur, IPC broadcasts them to
+        subscribed clients in i3/sway format.
+        """
+        from pubsub import pub
+        from . import topics
+
+        # Workspace events -> Broadcast to IPC clients
+        pub.subscribe(self._on_workspace_switched, topics.WORKSPACE_SWITCHED)
+
+        # Window events -> Broadcast to IPC clients
+        pub.subscribe(self._on_window_created, topics.WINDOW_CREATED)
+        pub.subscribe(self._on_window_closed, topics.WINDOW_CLOSED)
+
+    def _on_workspace_switched(self, current_workspace, old_workspace, output_name):
+        """Handle workspace switched event.
+
+        Args:
+            current_workspace: New workspace number
+            old_workspace: Previous workspace number
+            output_name: Name of the output
+        """
+        # Broadcast to IPC clients in i3 format
+        self.broadcast_event(
+            "workspace",
+            {
+                "change": "focus",
+                "current": {
+                    "num": current_workspace,
+                    "name": str(current_workspace),
+                    "visible": True,
+                    "focused": True,
+                    "output": output_name,
+                },
+                "old": {
+                    "num": old_workspace,
+                    "name": str(old_workspace),
+                    "visible": False,
+                    "focused": False,
+                    "output": output_name,
+                },
+            },
+        )
+
+    def _on_window_created(self, window):
+        """Handle window created event.
+
+        Args:
+            window: The created window
+        """
+        # TODO: Broadcast window creation event to IPC clients
+        pass
+
+    def _on_window_closed(self, window):
+        """Handle window closed event.
+
+        Args:
+            window: The closed window
+        """
+        # TODO: Broadcast window close event to IPC clients
+        pass
+
     def _get_socket_path(self) -> Path:
         """Get the Unix socket path for IPC.
 

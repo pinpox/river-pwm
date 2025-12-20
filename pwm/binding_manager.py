@@ -148,7 +148,9 @@ class BindingManager:
 
         # Tab cycling (for tabbed layout)
         self.bind_key(seat, XKB.Tab, mod, actions["cycle_tab_forward"])
-        self.bind_key(seat, XKB.Tab, mod | Modifiers.SHIFT, actions["cycle_tab_backward"])
+        self.bind_key(
+            seat, XKB.Tab, mod | Modifiers.SHIFT, actions["cycle_tab_backward"]
+        )
 
         # Workspace bindings: Mod+1-9
         num_workspaces = config.get("num_workspaces", 9)

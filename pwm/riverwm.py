@@ -252,7 +252,11 @@ class RiverWM:
         # Key and pointer bindings (delegated to BindingManager)
         self.binding_manager = BindingManager(self.manager)
 
-        # Set up callbacks
+        # Set up event subscriptions BEFORE callbacks
+        # This ensures subscribers are ready when events start being published
+        self._setup_event_subscriptions()
+
+        # Set up callbacks (which now publish events)
         self._setup_callbacks()
 
     @property
@@ -275,16 +279,82 @@ class RiverWM:
         """Set the focused output (delegates to FocusManager)."""
         self.focus_manager.set_focused_output(value)
 
+    def _setup_event_subscriptions(self):
+        """Subscribe to window manager events.
+
+        This method documents all event subscriptions in one place,
+        making it easy to see the event flow. All components subscribe
+        to the events they care about.
+
+        Event flow:
+        1. WindowManager emits events (via callbacks in _setup_callbacks)
+        2. Subscribers receive events and react
+        3. Multiple components can react to the same event
+        """
+        from pubsub import pub
+        from . import topics
+
+        # Window lifecycle -> Layout management
+        pub.subscribe(self._on_window_created, topics.WINDOW_CREATED)
+        pub.subscribe(self._on_window_closed, topics.WINDOW_CLOSED)
+
+        # Window lifecycle -> Focus management
+        # Note: FocusManager gets window events via _on_window_created/_on_window_closed
+        # which delegate to focus_manager methods
+
+        # Output events -> Focus management
+        pub.subscribe(self._on_output_created, topics.OUTPUT_CREATED)
+        pub.subscribe(self._on_output_removed, topics.OUTPUT_REMOVED)
+
+        # Seat events -> Binding setup and cleanup
+        pub.subscribe(self._on_seat_created, topics.SEAT_CREATED)
+        pub.subscribe(self._on_seat_removed, topics.SEAT_REMOVED)
+
+        # Lifecycle events -> Window manager initialization
+        pub.subscribe(self._on_manage_start, topics.LIFECYCLE_MANAGE_START)
+        pub.subscribe(self._on_render_start, topics.LIFECYCLE_RENDER_START)
+
     def _setup_callbacks(self):
-        """Set up window manager callbacks."""
-        self.manager.on_window_created = self._on_window_created
-        self.manager.on_window_closed = self._on_window_closed
-        self.manager.on_output_created = self._on_output_created
-        self.manager.on_output_removed = self._on_output_removed
-        self.manager.on_seat_created = self._on_seat_created
-        self.manager.on_seat_removed = self._on_seat_removed
-        self.manager.on_manage_start = self._on_manage_start
-        self.manager.on_render_start = self._on_render_start
+        """Set up window manager callbacks to publish events.
+
+        WindowManager callbacks now publish events via pypubsub instead of
+        calling methods directly. This allows multiple components to react
+        to window manager events in a decoupled way.
+        """
+        from pubsub import pub
+        from . import topics
+
+        # Window lifecycle events
+        self.manager.on_window_created = lambda w: pub.sendMessage(
+            topics.WINDOW_CREATED, window=w
+        )
+        self.manager.on_window_closed = lambda w: pub.sendMessage(
+            topics.WINDOW_CLOSED, window=w
+        )
+
+        # Output (monitor) events
+        self.manager.on_output_created = lambda o: pub.sendMessage(
+            topics.OUTPUT_CREATED, output=o
+        )
+        self.manager.on_output_removed = lambda o: pub.sendMessage(
+            topics.OUTPUT_REMOVED, output=o
+        )
+
+        # Seat (input device) events
+        self.manager.on_seat_created = lambda s: pub.sendMessage(
+            topics.SEAT_CREATED, seat=s
+        )
+        self.manager.on_seat_removed = lambda s: pub.sendMessage(
+            topics.SEAT_REMOVED, seat=s
+        )
+
+        # Lifecycle events
+        self.manager.on_manage_start = lambda: pub.sendMessage(
+            topics.LIFECYCLE_MANAGE_START
+        )
+        self.manager.on_render_start = lambda: pub.sendMessage(
+            topics.LIFECYCLE_RENDER_START
+        )
 
     def _on_window_created(self, window: Window):
         """Handle new window."""
@@ -774,6 +844,9 @@ class RiverWM:
 
     def _switch_workspace(self, workspace_id: int):
         """Switch to a workspace."""
+        from pubsub import pub
+        from . import topics
+
         if self.focused_output:
             # Get old workspace for event
             old_ws_num = self.layout_manager.active_workspace.get(
@@ -787,31 +860,18 @@ class RiverWM:
                 self.focused_window = workspace.focused_window
             self.manager.manage_dirty()
 
-            # Broadcast workspace event via IPC
+            # Publish workspace switched event
+            # IPC and other subscribers can react to this event
             output_name = (
                 f"output-{self.focused_output.wl_output_name}"
                 if self.focused_output.wl_output_name
                 else "unknown"
             )
-            self.ipc.broadcast_event(
-                "workspace",
-                {
-                    "change": "focus",
-                    "current": {
-                        "num": workspace_id,
-                        "name": str(workspace_id),
-                        "visible": True,
-                        "focused": True,
-                        "output": output_name,
-                    },
-                    "old": {
-                        "num": old_ws_num,
-                        "name": str(old_ws_num),
-                        "visible": False,
-                        "focused": False,
-                        "output": output_name,
-                    },
-                },
+            pub.sendMessage(
+                topics.WORKSPACE_SWITCHED,
+                current_workspace=workspace_id,
+                old_workspace=old_ws_num,
+                output_name=output_name,
             )
 
     def _move_to_workspace(self, workspace_id: int):
