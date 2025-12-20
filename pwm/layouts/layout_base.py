@@ -446,18 +446,22 @@ class LayoutManager:
                 workspace.promote()
 
     def _on_cycle_tab_forward(self):
-        """Handle CMD_CYCLE_TAB_FORWARD command."""
-        if self.focused_output:
-            workspace = self.get_active_workspace(self.focused_output)
-            if workspace:
-                workspace.cycle_tabs_forward()
+        """Handle CMD_CYCLE_TAB_FORWARD command.
+
+        Delegates to CMD_FOCUS_NEXT so FocusManager properly updates focus.
+        """
+        from .. import topics
+        # Tab cycling is the same as focusing next window
+        self.bus.sendMessage(topics.CMD_FOCUS_NEXT)
 
     def _on_cycle_tab_backward(self):
-        """Handle CMD_CYCLE_TAB_BACKWARD command."""
-        if self.focused_output:
-            workspace = self.get_active_workspace(self.focused_output)
-            if workspace:
-                workspace.cycle_tabs_backward()
+        """Handle CMD_CYCLE_TAB_BACKWARD command.
+
+        Delegates to CMD_FOCUS_PREV so FocusManager properly updates focus.
+        """
+        from .. import topics
+        # Tab cycling is the same as focusing previous window
+        self.bus.sendMessage(topics.CMD_FOCUS_PREV)
 
     def _on_switch_workspace(self, workspace_id):
         """Handle CMD_SWITCH_WORKSPACE command."""
