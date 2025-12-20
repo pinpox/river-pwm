@@ -114,7 +114,9 @@ class TestOperationManager:
         # Set window size in floating layout
         mock_workspace_with_floating.layout.set_size(window, 800, 600)
 
-        success = manager.start_resize(mock_seat, window, WindowEdges.BOTTOM | WindowEdges.RIGHT)
+        success = manager.start_resize(
+            mock_seat, window, WindowEdges.BOTTOM | WindowEdges.RIGHT
+        )
 
         assert success is True
         assert manager.is_active()

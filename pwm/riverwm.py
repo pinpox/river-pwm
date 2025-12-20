@@ -26,6 +26,7 @@ from .layouts import (
 from .protocol import Modifiers, WindowEdges, WindowCapabilities, BorderConfig
 from .operation_manager import OperationManager, OpType
 from .focus_manager import FocusManager
+from .binding_manager import BindingManager, BTN
 
 
 # XKB keysym values (from xkbcommon-keysyms.h)
@@ -96,14 +97,6 @@ class XKB:
 
 
 # Linux input event codes (from linux/input-event-codes.h)
-class BTN:
-    """Mouse button codes."""
-
-    LEFT = 0x110
-    RIGHT = 0x111
-    MIDDLE = 0x112
-
-
 def parse_color(color: str | Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
     """
     Parse a color value into RGBA tuple.
@@ -256,6 +249,9 @@ class RiverWM:
             get_window_workspace_fn=self._get_window_workspace
         )
 
+        # Key and pointer bindings (delegated to BindingManager)
+        self.binding_manager = BindingManager(self.manager)
+
         # Set up callbacks
         self._setup_callbacks()
 
@@ -373,16 +369,15 @@ class RiverWM:
         seat.on_op_delta = lambda dx, dy: self._on_op_delta(seat, dx, dy)
         seat.on_op_release = lambda: self._on_op_release(seat)
 
-        # Set up key bindings
-        self._setup_key_bindings(seat)
-
-        # Set up pointer bindings
-        self._setup_pointer_bindings(seat)
+        # Set up bindings (delegated to BindingManager)
+        self._setup_bindings(seat)
 
     def _on_seat_removed(self, seat: Seat):
         """Handle seat removed."""
         # End any operation from this seat
         self.operation_manager.end_operation(seat)
+        # Clean up bindings
+        self.binding_manager.cleanup_seat(seat)
 
     def _on_pointer_enter(self, seat: Seat, window: Window):
         """Handle pointer entering a window (delegates to FocusManager)."""
@@ -627,83 +622,36 @@ class RiverWM:
             a=to_32bit(color[3]),
         )
 
-    def _setup_key_bindings(self, seat: Seat):
-        """Set up key bindings for a seat."""
-        mod = self.config.mod
+    def _setup_bindings(self, seat: Seat):
+        """Set up all bindings for a seat (delegates to BindingManager)."""
+        actions = {
+            "quit": self._quit,
+            "close_focused": self._close_focused,
+            "spawn_terminal": lambda: self._spawn(self.config.terminal),
+            "spawn_launcher": lambda: self._spawn(self.config.launcher),
+            "focus_next": self._focus_next,
+            "focus_prev": self._focus_prev,
+            "swap_next": self._swap_next,
+            "swap_prev": self._swap_prev,
+            "promote": self._promote,
+            "cycle_layout": self._cycle_layout,
+            "cycle_layout_reverse": self._cycle_layout_reverse,
+            "toggle_fullscreen": self._toggle_fullscreen,
+            "cycle_tab_forward": self._cycle_tab_forward,
+            "cycle_tab_backward": self._cycle_tab_backward,
+            "switch_workspace": self._switch_workspace,
+            "move_to_workspace": self._move_to_workspace,
+            "move_binding_pressed": lambda: self._on_move_binding_pressed(seat),
+            "resize_binding_pressed": lambda: self._on_resize_binding_pressed(seat),
+        }
 
-        # Quit: Mod+Shift+Q
-        self._bind_key(seat, XKB.q, mod | Modifiers.SHIFT, self._quit)
+        config = {
+            "num_workspaces": self.config.num_workspaces,
+        }
 
-        # Close window: Mod+Q
-        self._bind_key(seat, XKB.q, mod, self._close_focused)
-
-        # Spawn terminal: Mod+Return
-        self._bind_key(seat, XKB.Return, mod, lambda: self._spawn(self.config.terminal))
-
-        # Spawn launcher: Mod+D
-        self._bind_key(seat, XKB.d, mod, lambda: self._spawn(self.config.launcher))
-
-        # Focus navigation
-        self._bind_key(seat, XKB.j, mod, self._focus_next)
-        self._bind_key(seat, XKB.k, mod, self._focus_prev)
-        self._bind_key(seat, XKB.Down, mod, self._focus_next)
-        self._bind_key(seat, XKB.Up, mod, self._focus_prev)
-
-        # Swap windows
-        self._bind_key(seat, XKB.j, mod | Modifiers.SHIFT, self._swap_next)
-        self._bind_key(seat, XKB.k, mod | Modifiers.SHIFT, self._swap_prev)
-
-        # Promote to master
-        self._bind_key(seat, XKB.Return, mod | Modifiers.SHIFT, self._promote)
-
-        # Cycle layouts
-        self._bind_key(seat, XKB.space, mod, self._cycle_layout)
-        self._bind_key(
-            seat, XKB.space, mod | Modifiers.SHIFT, self._cycle_layout_reverse
+        self.binding_manager.setup_default_bindings(
+            seat, self.config.mod, actions, config
         )
-
-        # Toggle fullscreen: Mod+F
-        self._bind_key(seat, XKB.f, mod, self._toggle_fullscreen)
-
-        # Tab cycling (for tabbed layout): Alt+Tab, Alt+Shift+Tab
-        self._bind_key(seat, XKB.Tab, mod, self._cycle_tab_forward)
-        self._bind_key(seat, XKB.Tab, mod | Modifiers.SHIFT, self._cycle_tab_backward)
-
-        # Workspace bindings: Mod+1-9
-        for i in range(1, self.config.num_workspaces + 1):
-            keysym = getattr(XKB, f"_{i}")
-            ws_id = i
-            self._bind_key(
-                seat, keysym, mod, lambda ws=ws_id: self._switch_workspace(ws)
-            )
-            self._bind_key(
-                seat,
-                keysym,
-                mod | Modifiers.SHIFT,
-                lambda ws=ws_id: self._move_to_workspace(ws),
-            )
-
-    def _bind_key(
-        self, seat: Seat, keysym: int, modifiers: Modifiers, action: Callable
-    ):
-        """Create and enable a key binding."""
-        binding = self.manager.get_xkb_binding(seat, keysym, modifiers)
-        binding.on_pressed = action
-        binding.enable()
-
-    def _setup_pointer_bindings(self, seat: Seat):
-        """Set up pointer bindings for a seat."""
-        mod = self.config.mod
-
-        # Move window: Mod+Left click
-        move_binding = seat.get_pointer_binding(BTN.LEFT, mod)
-        move_binding.on_pressed = lambda: self._on_move_binding_pressed(seat)
-        move_binding.enable()
-
-        # Resize window: Mod+Right click
-        resize_binding = seat.get_pointer_binding(BTN.RIGHT, mod)
-        resize_binding.on_pressed = lambda: self._on_resize_binding_pressed(seat)
-        resize_binding.enable()
 
     def _on_move_binding_pressed(self, seat: Seat):
         """Handle move binding pressed."""

@@ -84,9 +84,7 @@ class OperationManager:
         seat.op_start_pointer()
         return True
 
-    def start_resize(
-        self, seat: Seat, window: Window, edges: "WindowEdges"
-    ) -> bool:
+    def start_resize(self, seat: Seat, window: Window, edges: "WindowEdges") -> bool:
         """Start an interactive resize operation.
 
         Args:
