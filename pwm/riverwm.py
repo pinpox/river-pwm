@@ -220,20 +220,33 @@ class RiverWM:
     """
 
     def __init__(self, config: Optional[RiverConfig] = None):
+        """Initialize River WM.
+
+        Architecture:
+        1. Create event bus (Pypubsub)
+        2. Create components - they self-subscribe to events
+        3. Set up Wayland callbacks to bridge protocol events into bus
+        4. Run
+        """
         self.config = config or RiverConfig()
         self.manager = WindowManager()
 
+        # Setup debug event logging if enabled
+        if os.getenv("PWM_DEBUG"):
+            pub.subscribe(self.debug_event_logger, pub.ALL_TOPICS)
+
         # Create layout manager with configured layouts
         layouts = self.config.get_layouts()
-        self.layout_manager = LayoutManager(layouts=layouts)
+        self.layout_manager = LayoutManager(bus=pub, layouts=layouts)
 
         # Configure layout manager
         self.layout_manager.gap = self.config.gap
         self.layout_manager.border_width = self.config.border_width
         self.layout_manager.num_workspaces = self.config.num_workspaces
 
-        # Focus management (delegated to FocusManager)
+        # Focus management (self-subscribes to events)
         self.focus_manager = FocusManager(
+            bus=pub,
             get_window_workspace_fn=self._get_window_workspace,
             get_active_workspace_fn=lambda output: self.layout_manager.get_active_workspace(
                 output
@@ -241,25 +254,31 @@ class RiverWM:
             focus_follows_mouse=self.config.focus_follows_mouse,
         )
 
-        # IPC server
+        # Interactive operations (self-subscribes to events)
+        self.operation_manager = OperationManager(
+            get_window_workspace_fn=self._get_window_workspace
+        )
+
+        # Key and pointer bindings (publishes command events)
+        self.binding_manager = BindingManager(manager=self.manager)
+
+        # Window lifecycle commands (self-subscribes)
+        from .window_controller import WindowController
+
+        self.window_controller = WindowController(bus=pub, window_manager=self.manager)
+
+        # Application spawning (self-subscribes)
+        from .application_launcher import ApplicationLauncher
+
+        self.application_launcher = ApplicationLauncher(bus=pub, config=self.config)
+
+        # IPC server (self-subscribes for broadcasting, publishes commands)
         from .ipc import IPCServer
 
         self.ipc = IPCServer(self)
         self.manager.ipc_poll_callback = self.ipc.poll
 
-        # Interactive operations (delegated to OperationManager)
-        self.operation_manager = OperationManager(
-            get_window_workspace_fn=self._get_window_workspace
-        )
-
-        # Key and pointer bindings (delegated to BindingManager)
-        self.binding_manager = BindingManager(self.manager)
-
-        # Set up event subscriptions BEFORE callbacks
-        # This ensures subscribers are ready when events start being published
-        self._setup_event_subscriptions()
-
-        # Set up callbacks (which now publish events)
+        # Bridge Wayland protocol events into the event bus
         self._setup_callbacks()
 
     @property
@@ -290,49 +309,15 @@ class RiverWM:
           data_str = ", ".join(f"{k}={v}" for k, v in kwargs.items() if k != 'topic')
           print(f"[{timestamp}] EVENT: {topic_name} | {data_str}")
 
-    def _setup_event_subscriptions(self):
-        """Subscribe to window manager events.
-
-        This method documents all event subscriptions in one place,
-        making it easy to see the event flow. All components subscribe
-        to the events they care about.
-
-        Event flow:
-        1. WindowManager emits events (via callbacks in _setup_callbacks)
-        2. Subscribers receive events and react
-        3. Multiple components can react to the same event
-        """
-
-        # Setup up logging of all bus events, if DEBUG=true;
-        if os.getenv("PWM_DEBUG"):
-            pub.subscribe(self.debug_event_logger, pub.ALL_TOPICS)
-
-        # Window lifecycle -> Layout management
-        pub.subscribe(self._on_window_created, topics.WINDOW_CREATED)
-        pub.subscribe(self._on_window_closed, topics.WINDOW_CLOSED)
-
-        # Window lifecycle -> Focus management
-        # Note: FocusManager gets window events via _on_window_created/_on_window_closed
-        # which delegate to focus_manager methods
-
-        # Output events -> Focus management
-        pub.subscribe(self._on_output_created, topics.OUTPUT_CREATED)
-        pub.subscribe(self._on_output_removed, topics.OUTPUT_REMOVED)
-
-        # Seat events -> Binding setup and cleanup
-        pub.subscribe(self._on_seat_created, topics.SEAT_CREATED)
-        pub.subscribe(self._on_seat_removed, topics.SEAT_REMOVED)
-
-        # Lifecycle events -> Window manager initialization
-        pub.subscribe(self._on_manage_start, topics.LIFECYCLE_MANAGE_START)
-        pub.subscribe(self._on_render_start, topics.LIFECYCLE_RENDER_START)
-
     def _setup_callbacks(self):
-        """Set up window manager callbacks to publish events.
+        """Bridge Wayland protocol events into the event bus.
 
-        WindowManager callbacks now publish events via pypubsub instead of
-        calling methods directly. This allows multiple components to react
-        to window manager events in a decoupled way.
+        This method sets up callbacks on the WindowManager to publish events
+        to the bus when Wayland protocol events occur. Components subscribe
+        to these events to react accordingly.
+
+        RiverWM also subscribes to some events for River-specific setup like
+        window capabilities, decorations, and keybindings.
         """
         from pubsub import pub
         from . import topics
@@ -369,14 +354,19 @@ class RiverWM:
             topics.LIFECYCLE_RENDER_START
         )
 
+        # Subscribe to events that need River-specific handling
+        pub.subscribe(self._on_window_created, topics.WINDOW_CREATED)
+        pub.subscribe(self._on_seat_created, topics.SEAT_CREATED)
+        pub.subscribe(self._on_seat_removed, topics.SEAT_REMOVED)
+        pub.subscribe(self._on_manage_start, topics.LIFECYCLE_MANAGE_START)
+        pub.subscribe(self._on_render_start, topics.LIFECYCLE_RENDER_START)
+
     def _on_window_created(self, window: Window):
-        """Handle new window."""
-        # Add to layout
-        self.layout_manager.add_window(window, self.focused_output)
+        """Handle River-specific window setup.
 
-        # Focus the new window
-        self.focused_window = window
-
+        Note: LayoutManager and FocusManager handle window lifecycle via their
+        own subscriptions. This method only does River protocol setup.
+        """
         # Set capabilities
         window.set_capabilities(
             WindowCapabilities.WINDOW_MENU
@@ -406,42 +396,6 @@ class RiverWM:
         # Handle window requests
         self._handle_window_requests(window)
 
-    def _on_window_closed(self, window: Window):
-        """Handle window closed."""
-        self.layout_manager.remove_window(window)
-
-        # Update focus
-        if self.focused_window == window:
-            self.focused_window = None
-            # Try to focus another window
-            if self.focused_output:
-                workspace = self.layout_manager.get_active_workspace(
-                    self.focused_output
-                )
-                if workspace and workspace.focused_window:
-                    self.focused_window = workspace.focused_window
-
-    def _on_output_created(self, output: Output):
-        """Handle new output."""
-        self.layout_manager.add_output(output)
-
-        # Set as focused if none
-        if self.focused_output is None:
-            self.focused_output = output
-
-        # Set as default for layer shell
-        if output.layer_shell_output:
-            output.layer_shell_output.set_default()
-
-    def _on_output_removed(self, output: Output):
-        """Handle output removed."""
-        self.layout_manager.remove_output(output)
-
-        if self.focused_output == output:
-            self.focused_output = None
-            if self.layout_manager.outputs:
-                self.focused_output = next(iter(self.layout_manager.outputs.values()))
-
     def _on_seat_created(self, seat: Seat):
         """Handle new seat."""
         # Set up pointer callbacks
@@ -463,9 +417,13 @@ class RiverWM:
         self.binding_manager.cleanup_seat(seat)
 
     def _on_pointer_enter(self, seat: Seat, window: Window):
-        """Handle pointer entering a window (delegates to FocusManager)."""
-        self.focus_manager.handle_pointer_enter(
-            window, self.operation_manager.is_active()
+        """Handle pointer entering a window - publish event to bus."""
+        from pubsub import pub
+        from . import topics
+
+        # Publish pointer enter event so FocusManager can react
+        pub.sendMessage(
+            topics.POINTER_ENTER, window=window, in_operation=self.operation_manager.is_active()
         )
         self.manager.manage_dirty()
 
@@ -707,34 +665,12 @@ class RiverWM:
 
     def _setup_bindings(self, seat: Seat):
         """Set up all bindings for a seat (delegates to BindingManager)."""
-        actions = {
-            "quit": self._quit,
-            "close_focused": self._close_focused,
-            "spawn_terminal": lambda: self._spawn(self.config.terminal),
-            "spawn_launcher": lambda: self._spawn(self.config.launcher),
-            "focus_next": self._focus_next,
-            "focus_prev": self._focus_prev,
-            "swap_next": self._swap_next,
-            "swap_prev": self._swap_prev,
-            "promote": self._promote,
-            "cycle_layout": self._cycle_layout,
-            "cycle_layout_reverse": self._cycle_layout_reverse,
-            "toggle_fullscreen": self._toggle_fullscreen,
-            "cycle_tab_forward": self._cycle_tab_forward,
-            "cycle_tab_backward": self._cycle_tab_backward,
-            "switch_workspace": self._switch_workspace,
-            "move_to_workspace": self._move_to_workspace,
-            "move_binding_pressed": lambda: self._on_move_binding_pressed(seat),
-            "resize_binding_pressed": lambda: self._on_resize_binding_pressed(seat),
-        }
-
         config = {
             "num_workspaces": self.config.num_workspaces,
         }
 
-        self.binding_manager.setup_default_bindings(
-            seat, self.config.mod, actions, config
-        )
+        # BindingManager now publishes event topics instead of calling actions
+        self.binding_manager.setup_default_bindings(seat, self.config.mod, config)
 
     def _on_move_binding_pressed(self, seat: Seat):
         """Handle move binding pressed."""
@@ -748,159 +684,6 @@ class RiverWM:
             self._start_resize(
                 seat, seat.pointer_window, WindowEdges.RIGHT | WindowEdges.BOTTOM
             )
-
-    # Actions
-
-    def _quit(self):
-        """Quit the window manager."""
-        self.manager.stop()
-
-    def _close_focused(self):
-        """Close the focused window."""
-        if self.focused_window:
-            self.focused_window.close()
-
-    def _spawn(self, command: str):
-        """Spawn a program."""
-        try:
-            # Get current WAYLAND_DISPLAY from environment
-            # This ensures spawned programs connect to River, not parent compositor
-            env = os.environ.copy()
-
-            subprocess.Popen(
-                command,
-                shell=True,
-                start_new_session=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                env=env,
-            )
-        except Exception as e:
-            print(f"Failed to spawn {command}: {e}")
-
-    def _focus_next(self):
-        """Focus the next window (delegates to FocusManager)."""
-        self.focus_manager.focus_next()
-        self.manager.manage_dirty()
-
-    def _focus_prev(self):
-        """Focus the previous window (delegates to FocusManager)."""
-        self.focus_manager.focus_prev()
-        self.manager.manage_dirty()
-
-    def _swap_next(self):
-        """Swap focused window with next."""
-        if self.focused_output:
-            workspace = self.layout_manager.get_active_workspace(self.focused_output)
-            if workspace:
-                workspace.swap_next()
-                self.manager.manage_dirty()
-
-    def _swap_prev(self):
-        """Swap focused window with previous."""
-        if self.focused_output:
-            workspace = self.layout_manager.get_active_workspace(self.focused_output)
-            if workspace:
-                workspace.swap_prev()
-                self.manager.manage_dirty()
-
-    def _promote(self):
-        """Promote focused window to master."""
-        if self.focused_output:
-            workspace = self.layout_manager.get_active_workspace(self.focused_output)
-            if workspace:
-                workspace.promote()
-                self.manager.manage_dirty()
-
-    def _cycle_layout(self):
-        """Cycle to the next layout."""
-        if self.focused_output:
-            self.layout_manager.cycle_layout(self.focused_output, 1)
-            self.manager.manage_dirty()
-
-    def _cycle_layout_reverse(self):
-        """Cycle to the previous layout."""
-        if self.focused_output:
-            self.layout_manager.cycle_layout(self.focused_output, -1)
-            self.manager.manage_dirty()
-
-    def _cycle_tab_forward(self):
-        """Cycle to next tab (for tabbed layout)."""
-        if self.focused_output:
-            workspace = self.layout_manager.get_active_workspace(self.focused_output)
-            if workspace:
-                workspace.cycle_tabs_forward()
-                self.focused_window = workspace.focused_window
-                self.manager.manage_dirty()
-
-    def _cycle_tab_backward(self):
-        """Cycle to previous tab (for tabbed layout)."""
-        if self.focused_output:
-            workspace = self.layout_manager.get_active_workspace(self.focused_output)
-            if workspace:
-                workspace.cycle_tabs_backward()
-                self.focused_window = workspace.focused_window
-                self.manager.manage_dirty()
-
-    def _toggle_fullscreen(self):
-        """Toggle fullscreen for the focused window."""
-        if self.focused_window and self.focused_output:
-            from .objects import WindowState
-
-            if self.focused_window.state == WindowState.FULLSCREEN:
-                self.focused_window.exit_fullscreen()
-                self.focused_window.inform_not_fullscreen()
-            else:
-                self.focused_window.fullscreen(self.focused_output)
-                self.focused_window.inform_fullscreen()
-            self.manager.manage_dirty()
-
-    def _switch_workspace(self, workspace_id: int):
-        """Switch to a workspace."""
-        from pubsub import pub
-        from . import topics
-
-        if self.focused_output:
-            # Get old workspace for event
-            old_ws_num = self.layout_manager.active_workspace.get(
-                self.focused_output.object_id, 1
-            )
-
-            # Switch workspace
-            self.layout_manager.switch_workspace(self.focused_output, workspace_id)
-            workspace = self.layout_manager.get_active_workspace(self.focused_output)
-            if workspace:
-                self.focused_window = workspace.focused_window
-            self.manager.manage_dirty()
-
-            # Publish workspace switched event
-            # IPC and other subscribers can react to this event
-            output_name = (
-                f"output-{self.focused_output.wl_output_name}"
-                if self.focused_output.wl_output_name
-                else "unknown"
-            )
-            pub.sendMessage(
-                topics.WORKSPACE_SWITCHED,
-                current_workspace=workspace_id,
-                old_workspace=old_ws_num,
-                output_name=output_name,
-            )
-
-    def _move_to_workspace(self, workspace_id: int):
-        """Move focused window to a workspace."""
-        if self.focused_window:
-            self.layout_manager.move_window_to_workspace(
-                self.focused_window, workspace_id
-            )
-            # Focus another window in current workspace
-            if self.focused_output:
-                workspace = self.layout_manager.get_active_workspace(
-                    self.focused_output
-                )
-                if workspace:
-                    self.focused_window = workspace.focused_window
-            self.manager.manage_dirty()
 
     def run(self):
         """Run the window manager."""
