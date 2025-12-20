@@ -168,6 +168,9 @@
             export PWM_TERMINAL="${pkgs.foot}/bin/foot"
             export PWM_LAUNCHER="${pkgs.fuzzel}/bin/fuzzel"
 
+            # Turn on logging for all bus events
+            export PWM_DEBUG=true;
+
             # Keyboard layout configuration
             export XKB_DEFAULT_LAYOUT="''${XKB_DEFAULT_LAYOUT:-us}"
             export XKB_DEFAULT_VARIANT="''${XKB_DEFAULT_VARIANT:-colemak}"

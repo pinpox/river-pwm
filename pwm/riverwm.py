@@ -5,6 +5,9 @@ A complete window manager built on the River Wayland compositor.
 """
 
 from __future__ import annotations
+import time
+from pubsub import pub
+from . import topics
 import subprocess
 import os
 from dataclasses import dataclass, field
@@ -279,6 +282,14 @@ class RiverWM:
         """Set the focused output (delegates to FocusManager)."""
         self.focus_manager.set_focused_output(value)
 
+    def debug_event_logger(self, topic=pub.AUTO_TOPIC, **kwargs):
+          """Log all events published on the event bus."""
+          timestamp = time.strftime("%H:%M:%S")
+          topic_name = topic.getName()
+          # Format the event data nicely
+          data_str = ", ".join(f"{k}={v}" for k, v in kwargs.items() if k != 'topic')
+          print(f"[{timestamp}] EVENT: {topic_name} | {data_str}")
+
     def _setup_event_subscriptions(self):
         """Subscribe to window manager events.
 
@@ -291,8 +302,10 @@ class RiverWM:
         2. Subscribers receive events and react
         3. Multiple components can react to the same event
         """
-        from pubsub import pub
-        from . import topics
+
+        # Setup up logging of all bus events, if DEBUG=true;
+        if os.getenv("PWM_DEBUG"):
+            pub.subscribe(self.debug_event_logger, pub.ALL_TOPICS)
 
         # Window lifecycle -> Layout management
         pub.subscribe(self._on_window_created, topics.WINDOW_CREATED)
