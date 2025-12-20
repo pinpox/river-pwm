@@ -40,8 +40,10 @@ class TabDecoration:
             self.width = 0  # Will be set based on area width
             self.height = size  # Fixed height for horizontal tabs
 
-        # Map of window_id -> (surface, decoration_obj, pool, buffer)
-        self.window_decorations = {}
+        # Map of window_id -> dict with keys: surface, decoration_obj, pool, buffer
+        from typing import Dict, Any
+
+        self.window_decorations: Dict[int, Dict[str, Any]] = {}
 
     def render(
         self,
@@ -101,6 +103,8 @@ class TabDecoration:
 
         try:
             # Create wl_surface
+            if self.connection.compositor_id is None:
+                return
             compositor = WlCompositor(self.connection.compositor_id, self.connection)
             surface = compositor.create_surface()
 

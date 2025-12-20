@@ -74,6 +74,8 @@ class DefaultWindowDecoration:
 
         try:
             # Create wl_surface
+            if self.connection.compositor_id is None:
+                return
             compositor = WlCompositor(self.connection.compositor_id, self.connection)
             surface = compositor.create_surface()
 

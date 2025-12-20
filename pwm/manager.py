@@ -242,7 +242,7 @@ class WindowManager:
             window = Window(window_id, self)
             self.windows[window_id] = window
             self.connection.register_object(window)
-            window.on_closed = lambda w=window: self._on_window_closed(w)
+            window.on_closed = (lambda w: lambda: self._on_window_closed(w))(window)
             if self.on_window_created:
                 self.on_window_created(window)
 
@@ -251,7 +251,7 @@ class WindowManager:
             output = Output(output_id, self)
             self.outputs[output_id] = output
             self.connection.register_object(output)
-            output.on_removed = lambda o=output: self._on_output_removed(o)
+            output.on_removed = (lambda o: lambda: self._on_output_removed(o))(output)
             # Create layer shell output if available
             if self.layer_shell_id:
                 self._create_layer_shell_output(output)
@@ -263,7 +263,7 @@ class WindowManager:
             seat = Seat(seat_id, self)
             self.seats[seat_id] = seat
             self.connection.register_object(seat)
-            seat.on_removed = lambda s=seat: self._on_seat_removed(s)
+            seat.on_removed = (lambda s: lambda: self._on_seat_removed(s))(seat)
             # Create layer shell seat if available
             if self.layer_shell_id:
                 self._create_layer_shell_seat(seat)
@@ -293,6 +293,8 @@ class WindowManager:
 
     def _create_layer_shell_output(self, output: Output):
         """Create layer shell output object."""
+        if self.layer_shell_id is None:
+            return
         obj_id = self.connection.allocate_id()
         ls_output = LayerShellOutput(obj_id, self, output)
         self.connection.register_object(ls_output)
@@ -303,6 +305,8 @@ class WindowManager:
 
     def _create_layer_shell_seat(self, seat: Seat):
         """Create layer shell seat object."""
+        if self.layer_shell_id is None:
+            return
         obj_id = self.connection.allocate_id()
         ls_seat = LayerShellSeat(obj_id, self, seat)
         self.connection.register_object(ls_seat)

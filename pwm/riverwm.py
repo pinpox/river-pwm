@@ -386,11 +386,17 @@ class RiverWM:
             print(
                 f"DEBUG: Enabling SSD for window {window.object_id}, title={window.title}"
             )
+            # Config colors are already parsed into tuples in __post_init__
+            assert isinstance(self.config.ssd_background_color, tuple)
+            assert isinstance(self.config.ssd_focused_background_color, tuple)
+            assert isinstance(self.config.ssd_text_color, tuple)
+            assert isinstance(self.config.ssd_button_color, tuple)
+
             style = DecorationStyle(
                 height=self.config.ssd_height,
                 position=self.config.ssd_position.value,
-                bg_color=self.config.border_color,
-                focused_bg_color=self.config.focused_border_color,
+                bg_color=self.config.ssd_background_color,
+                focused_bg_color=self.config.ssd_focused_background_color,
                 text_color=self.config.ssd_text_color,
                 button_color=self.config.ssd_button_color,
                 border_width=self.config.border_width,

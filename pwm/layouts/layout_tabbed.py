@@ -6,7 +6,7 @@ Only the focused window is visible.
 """
 
 from __future__ import annotations
-from typing import List, Dict, TYPE_CHECKING
+from typing import List, Dict, Optional, TYPE_CHECKING
 
 from .layout_base import Layout, LayoutGeometry
 from ..protocol import Area, WindowEdges
@@ -22,7 +22,9 @@ class TabbedLayout(Layout):
     Only the focused window is visible, with a tab bar showing all windows.
     """
 
-    def __init__(self, gap: int = 0, tab_width: int = None, border_width: int = 0):
+    def __init__(
+        self, gap: int = 0, tab_width: Optional[int] = None, border_width: int = 0
+    ):
         self.gap = gap
         self.border_width = border_width
         # Auto-calculate tab width if not specified
@@ -62,7 +64,10 @@ class TabbedLayout(Layout):
         return "tabbed"
 
     def calculate(
-        self, windows: List["Window"], area: Area, focused_window: "Window" = None
+        self,
+        windows: List["Window"],
+        area: Area,
+        focused_window: Optional["Window"] = None,
     ) -> Dict["Window", LayoutGeometry]:
         if not windows:
             return {}

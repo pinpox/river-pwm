@@ -5,7 +5,7 @@ Traditional floating windows with manual positioning.
 """
 
 from __future__ import annotations
-from typing import List, Dict, Tuple, TYPE_CHECKING
+from typing import List, Dict, Tuple, Optional, TYPE_CHECKING
 
 from .layout_base import Layout, LayoutGeometry
 from ..protocol import Area
@@ -38,7 +38,10 @@ class FloatingLayout(Layout):
         self._sizes[window.object_id] = (width, height)
 
     def calculate(
-        self, windows: List["Window"], area: Area
+        self,
+        windows: List["Window"],
+        area: Area,
+        focused_window: Optional["Window"] = None,
     ) -> Dict["Window", LayoutGeometry]:
         if not windows:
             return {}

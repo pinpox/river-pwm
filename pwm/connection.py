@@ -223,8 +223,11 @@ class WaylandConnection:
                 name = decoder.uint32()
                 interface = decoder.string()
                 version = decoder.uint32()
-                self.globals[name] = GlobalInfo(name, interface, version)
-                self._dispatch_event("wl_registry", "global", name, interface, version)
+                if interface:  # Only create GlobalInfo if interface is not None
+                    self.globals[name] = GlobalInfo(name, interface, version)
+                    self._dispatch_event(
+                        "wl_registry", "global", name, interface, version
+                    )
             elif msg.opcode == self.WL_REGISTRY_GLOBAL_REMOVE:
                 decoder = MessageDecoder(msg.payload)
                 name = decoder.uint32()

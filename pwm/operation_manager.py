@@ -34,7 +34,7 @@ class Operation:
     start_y: int
     start_width: int = 0
     start_height: int = 0
-    resize_edges: "WindowEdges" = None
+    resize_edges: Optional["WindowEdges"] = None
 
 
 class OperationManager:
@@ -158,7 +158,7 @@ class OperationManager:
                 new_y = self.current.start_y + dy
                 workspace.layout.set_position(self.current.window, new_x, new_y)
 
-        elif self.current.type == OpType.RESIZE:
+        elif self.current.type == OpType.RESIZE and self.current.resize_edges:
             new_width = self.current.start_width
             new_height = self.current.start_height
             new_x = self.current.start_x

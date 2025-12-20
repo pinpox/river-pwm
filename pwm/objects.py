@@ -36,6 +36,9 @@ from .protocol import (
 
 if TYPE_CHECKING:
     from .manager import WindowManager
+    from .connection import WaylandConnection
+    from .decoration import DecorationStyle
+    from .shm import WlBuffer
 
 
 class WindowState(Enum):
@@ -349,7 +352,7 @@ class Decoration:
         """
         from .decoration import DecorationRenderer
         from .wayland import WlCompositor, WlSurface
-        from .shm import ShmPool, WlShm
+        from .shm import ShmPool, WlShm, WlBuffer
 
         self.window = window
         self.style = style
@@ -360,7 +363,7 @@ class Decoration:
         self.surface: Optional[WlSurface] = None
         self.decoration_obj: Optional[ProtocolObject] = None
         self.pool: Optional[ShmPool] = None
-        self.buffer = None
+        self.buffer: Optional[WlBuffer] = None
 
         self.width = 0
         self.created = False
@@ -379,8 +382,9 @@ class Decoration:
         height = self.style.height
 
         # Create wl_surface
-        compositor = WlCompositor(self.connection.compositor_id, self.connection)
-        self.surface = compositor.create_surface()
+        if self.connection.compositor_id is not None:
+            compositor = WlCompositor(self.connection.compositor_id, self.connection)
+            self.surface = compositor.create_surface()
 
         # Create river_decoration_v1
         # Determine position and use appropriate request
@@ -437,13 +441,14 @@ class Decoration:
         self.renderer.render(self.width, title, focused, maximized, shm_data)
 
         # Attach buffer to surface
-        self.surface.attach(self.buffer)
+        if self.surface and self.buffer:
+            self.surface.attach(self.buffer)
 
-        # Mark entire surface as damaged
-        self.surface.damage_buffer(0, 0, self.width, self.style.height)
+            # Mark entire surface as damaged
+            self.surface.damage_buffer(0, 0, self.width, self.style.height)
 
-        # Commit surface
-        self.surface.commit()
+            # Commit surface
+            self.surface.commit()
 
     def set_offset_and_sync(self):
         """Set decoration offset and synchronize with next window commit."""

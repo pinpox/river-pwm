@@ -206,7 +206,7 @@ class IPCServer:
 
             magic = header[:6]
             if magic != self.MAGIC:
-                print(f"IPC: Invalid magic bytes: {magic}")
+                print(f"IPC: Invalid magic bytes: {magic!r}")
                 self._remove_client(client)
                 return
 
@@ -278,9 +278,11 @@ class IPCServer:
                 return self._get_version()
             elif msg_type == MessageType.GET_TREE:
                 print(f"IPC: GET_TREE request")
-                result = self._get_tree()
-                print(f"IPC: Returning tree with {len(result.get('nodes', []))} nodes")
-                return result
+                tree_result: Dict[str, Any] = self._get_tree()
+                nodes = tree_result.get("nodes", [])
+                if isinstance(nodes, list):
+                    print(f"IPC: Returning tree with {len(nodes)} nodes")
+                return tree_result
             elif msg_type == MessageType.SUBSCRIBE:
                 events = json.loads(payload.decode("utf-8"))
                 # Add to existing subscriptions rather than replacing
@@ -331,7 +333,7 @@ class IPCServer:
         Returns:
             List of workspace dictionaries
         """
-        workspaces = []
+        workspaces: List[Dict[str, Any]] = []
 
         if not self.wm.focused_output:
             return workspaces
@@ -349,9 +351,9 @@ class IPCServer:
             is_active = num == active_num
 
             # Add layout and tab information
-            layout_name = ws.layout.name if ws else "tile-right"
-            tab_info = {}
-            if ws and ws.layout.name == "tabbed":
+            layout_name = ws.layout.name if ws and ws.layout else "tile-right"
+            tab_info: Dict[str, Any] = {}
+            if ws and ws.layout and ws.layout.name == "tabbed":
                 focused_idx = 0
                 if ws.focused_window and ws.focused_window in ws.windows:
                     focused_idx = ws.windows.index(ws.focused_window)
@@ -445,7 +447,7 @@ class IPCServer:
                 is_focused = num == active_num
 
                 # Get windows for this workspace
-                window_nodes = []
+                window_nodes: List[Dict[str, Any]] = []
                 if ws:
                     for window in ws.windows:
                         window_nodes.append(

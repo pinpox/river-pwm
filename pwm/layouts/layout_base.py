@@ -39,7 +39,10 @@ class Layout(ABC):
 
     @abstractmethod
     def calculate(
-        self, windows: List["Window"], area: Area
+        self,
+        windows: List["Window"],
+        area: Area,
+        focused_window: Optional["Window"] = None,
     ) -> Dict["Window", LayoutGeometry]:
         """
         Calculate window positions and sizes.
@@ -47,6 +50,7 @@ class Layout(ABC):
         Args:
             windows: List of windows to layout
             area: Available area for the layout
+            focused_window: Currently focused window (optional, used for stacking order)
 
         Returns:
             Dictionary mapping windows to their calculated geometry
@@ -83,7 +87,7 @@ class Workspace:
 
     name: str
     windows: List["Window"] = field(default_factory=list)
-    layout: Layout = field(default_factory=lambda: None)
+    layout: Optional[Layout] = None
     focused_window: Optional["Window"] = None
 
     def add_window(self, window: "Window"):
@@ -100,7 +104,7 @@ class Workspace:
             if self.focused_window == window:
                 self.focused_window = self.windows[0] if self.windows else None
             # Clean up floating layout if needed
-            if hasattr(self.layout, "remove_window"):
+            if self.layout and hasattr(self.layout, "remove_window"):
                 self.layout.remove_window(window)
 
     def focus_next(self):
@@ -378,10 +382,11 @@ class LayoutManager:
                 delattr(workspace.layout, "_decorations_created")
 
         current_idx = 0
-        for i, layout in enumerate(self.layouts):
-            if layout.name == workspace.layout.name:
-                current_idx = i
-                break
+        if workspace.layout:
+            for i, layout in enumerate(self.layouts):
+                if layout.name == workspace.layout.name:
+                    current_idx = i
+                    break
 
         new_idx = (current_idx + direction) % len(self.layouts)
         # Use the layout instance from self.layouts
@@ -393,7 +398,7 @@ class LayoutManager:
     def calculate_layout(self, output: "Output") -> Dict["Window", LayoutGeometry]:
         """Calculate the layout for an output."""
         workspace = self.get_active_workspace(output)
-        if workspace is None:
+        if workspace is None or workspace.layout is None:
             return {}
 
         # Get usable area (respecting layer shell exclusive zones)
@@ -403,17 +408,10 @@ class LayoutManager:
             if ls_area.width > 0 and ls_area.height > 0:
                 area = ls_area
 
-        # Pass focused_window to layout for stacking order
-        # Check if layout's calculate() accepts focused_window parameter
-        import inspect
-
-        sig = inspect.signature(workspace.layout.calculate)
-        if "focused_window" in sig.parameters:
-            return workspace.layout.calculate(
-                workspace.windows, area, workspace.focused_window
-            )
-        else:
-            return workspace.layout.calculate(workspace.windows, area)
+        # All layouts now accept focused_window parameter
+        return workspace.layout.calculate(
+            workspace.windows, area, workspace.focused_window
+        )
 
     # Command event handlers
     def _on_cycle_layout(self):

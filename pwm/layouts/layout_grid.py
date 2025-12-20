@@ -5,7 +5,7 @@ Windows arranged in a grid pattern.
 """
 
 from __future__ import annotations
-from typing import List, Dict, TYPE_CHECKING
+from typing import List, Dict, Optional, TYPE_CHECKING
 
 from .layout_base import Layout, LayoutGeometry
 from ..protocol import Area, WindowEdges
@@ -27,7 +27,10 @@ class GridLayout(Layout):
         return "grid"
 
     def calculate(
-        self, windows: List["Window"], area: Area
+        self,
+        windows: List["Window"],
+        area: Area,
+        focused_window: Optional["Window"] = None,
     ) -> Dict["Window", LayoutGeometry]:
         if not windows:
             return {}
