@@ -77,6 +77,8 @@ from .riverwm import (
     BTN,
 )
 
+from . import topics
+
 __all__ = [
     # Version
     "__version__",
@@ -122,4 +124,6 @@ __all__ = [
     "DecorationPosition",
     "XKB",
     "BTN",
+    # Event topics
+    "topics",
 ]

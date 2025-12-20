@@ -7,7 +7,8 @@ Customize your window manager settings here.
 
 import sys
 import os
-from pwm import RiverWM, RiverConfig, DecorationPosition
+from pwm import RiverWM, RiverConfig, DecorationPosition, Modifiers, XKB  # noqa: F401
+from pwm import topics  # For custom keybindings  # noqa: F401
 
 # Optional: Customize your layout list
 # Uncomment to use custom layouts instead of defaults
@@ -25,6 +26,18 @@ from pwm import RiverWM, RiverConfig, DecorationPosition
 #     GridLayout(gap=12),
 #     CenteredMasterLayout(gap=12),
 #     FloatingLayout(),
+# ]
+
+# Optional: Custom keybindings
+# Each binding is a tuple of (keysym, modifiers, event_topic, event_data)
+# Example custom keybindings:
+# my_keybindings = [
+#     # Bind Mod+F1 to switch to workspace 10 (beyond the default 9)
+#     (XKB.F1, Modifiers.MOD4, topics.CMD_SWITCH_WORKSPACE, {"workspace_id": 10}),
+#     # Bind Mod+Shift+F1 to move window to workspace 10
+#     (XKB.F1, Modifiers.MOD4 | Modifiers.SHIFT, topics.CMD_MOVE_TO_WORKSPACE, {"workspace_id": 10}),
+#     # Bind Mod+P to spawn a custom application
+#     # (XKB.p, Modifiers.MOD4, topics.CMD_SPAWN_TERMINAL, {}),
 # ]
 
 # Create configuration
@@ -52,6 +65,8 @@ config = RiverConfig(
     num_workspaces=9,
     # Focus follows mouse
     focus_follows_mouse=True,
+    # Optional: Custom keybindings
+    # custom_keybindings=my_keybindings,
 )
 
 # Create and run window manager

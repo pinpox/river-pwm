@@ -179,6 +179,10 @@ class RiverConfig:
     # Layouts (default to all built-in layouts)
     layouts: Optional[List] = None
 
+    # Custom keybindings: list of (keysym, modifiers, event_topic, event_data) tuples
+    # Example: [(XKB.F1, Modifiers.MOD4, topics.CMD_SWITCH_WORKSPACE, {"workspace_id": 10})]
+    custom_keybindings: Optional[List[Tuple[int, Modifiers, str, dict]]] = None
+
     def __post_init__(self):
         """Parse color strings into tuples."""
         self.border_color = parse_color(self.border_color)
@@ -671,6 +675,10 @@ class RiverWM:
 
         # BindingManager now publishes event topics instead of calling actions
         self.binding_manager.setup_default_bindings(seat, self.config.mod, config)
+
+        # Set up custom bindings if configured
+        if self.config.custom_keybindings:
+            self.binding_manager.setup_custom_bindings(seat, self.config.custom_keybindings)
 
     def _on_move_binding_pressed(self, seat: Seat):
         """Handle move binding pressed."""
