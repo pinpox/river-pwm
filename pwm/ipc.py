@@ -522,7 +522,9 @@ class IPCServer:
                 ws_num = int(ws_num_str)
                 if 1 <= ws_num <= self.wm.config.num_workspaces:
                     # Publish command event instead of calling directly
-                    print(f"IPC: Publishing CMD_SWITCH_WORKSPACE for workspace {ws_num}")
+                    print(
+                        f"IPC: Publishing CMD_SWITCH_WORKSPACE for workspace {ws_num}"
+                    )
                     pub.sendMessage(topics.CMD_SWITCH_WORKSPACE, workspace_id=ws_num)
                     return [{"success": True}]
                 else:

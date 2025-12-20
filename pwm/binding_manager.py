@@ -57,7 +57,12 @@ class BindingManager:
         )  # seat_id -> bindings
 
     def bind_key(
-        self, seat: Seat, keysym: int, modifiers: "Modifiers", event_topic: str, **event_data
+        self,
+        seat: Seat,
+        keysym: int,
+        modifiers: "Modifiers",
+        event_topic: str,
+        **event_data,
     ):
         """Create and enable a key binding that publishes a command event.
 
@@ -86,7 +91,12 @@ class BindingManager:
         )
 
     def bind_pointer(
-        self, seat: Seat, button: int, modifiers: "Modifiers", event_topic: str, **event_data
+        self,
+        seat: Seat,
+        button: int,
+        modifiers: "Modifiers",
+        event_topic: str,
+        **event_data,
     ):
         """Create and enable a pointer button binding that publishes a command event.
 
@@ -174,15 +184,15 @@ class BindingManager:
             keysym = getattr(XKB, f"_{i}")
             # Switch to workspace
             self.bind_key(
-                seat, keysym, mod,
-                topics.CMD_SWITCH_WORKSPACE,
-                workspace_id=i
+                seat, keysym, mod, topics.CMD_SWITCH_WORKSPACE, workspace_id=i
             )
             # Move window to workspace
             self.bind_key(
-                seat, keysym, mod | Modifiers.SHIFT,
+                seat,
+                keysym,
+                mod | Modifiers.SHIFT,
                 topics.CMD_MOVE_TO_WORKSPACE,
-                workspace_id=i
+                workspace_id=i,
             )
 
         # Pointer bindings

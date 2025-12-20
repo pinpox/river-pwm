@@ -306,12 +306,12 @@ class RiverWM:
         self.focus_manager.set_focused_output(value)
 
     def debug_event_logger(self, topic=pub.AUTO_TOPIC, **kwargs):
-          """Log all events published on the event bus."""
-          timestamp = time.strftime("%H:%M:%S")
-          topic_name = topic.getName()
-          # Format the event data nicely
-          data_str = ", ".join(f"{k}={v}" for k, v in kwargs.items() if k != 'topic')
-          print(f"[{timestamp}] EVENT: {topic_name} | {data_str}")
+        """Log all events published on the event bus."""
+        timestamp = time.strftime("%H:%M:%S")
+        topic_name = topic.getName()
+        # Format the event data nicely
+        data_str = ", ".join(f"{k}={v}" for k, v in kwargs.items() if k != "topic")
+        print(f"[{timestamp}] EVENT: {topic_name} | {data_str}")
 
     def _setup_callbacks(self):
         """Bridge Wayland protocol events into the event bus.
@@ -427,7 +427,9 @@ class RiverWM:
 
         # Publish pointer enter event so FocusManager can react
         pub.sendMessage(
-            topics.POINTER_ENTER, window=window, in_operation=self.operation_manager.is_active()
+            topics.POINTER_ENTER,
+            window=window,
+            in_operation=self.operation_manager.is_active(),
         )
         self.manager.manage_dirty()
 
@@ -678,7 +680,9 @@ class RiverWM:
 
         # Set up custom bindings if configured
         if self.config.custom_keybindings:
-            self.binding_manager.setup_custom_bindings(seat, self.config.custom_keybindings)
+            self.binding_manager.setup_custom_bindings(
+                seat, self.config.custom_keybindings
+            )
 
     def _on_move_binding_pressed(self, seat: Seat):
         """Handle move binding pressed."""

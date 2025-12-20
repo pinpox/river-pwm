@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Simple test script for tabbed layout
 
 echo "=== Tabbed Layout Test ==="

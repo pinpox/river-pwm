@@ -44,6 +44,7 @@
           projectRootFile = "flake.nix";
           programs.nixfmt.enable = true;
           programs.black.enable = true;
+          programs.mypy.enable = true;
         }
       );
 
@@ -82,7 +83,6 @@
           pwm = pkgs.writers.writePython3Bin "pwm" {
             libraries = [ self.packages.${system}.pwm-lib ];
             flakeIgnore = [
-              "E265"
               "E501"
             ];
           } (builtins.readFile ./pwm.py);

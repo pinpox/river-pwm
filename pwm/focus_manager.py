@@ -144,6 +144,7 @@ class FocusManager:
                     # Publish None to indicate no focused window
                     from pubsub import pub
                     from . import topics
+
                     pub.sendMessage(topics.FOCUS_CHANGED, window=None)
 
     def _on_output_created(self, output: Output):
