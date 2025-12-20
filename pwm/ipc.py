@@ -500,7 +500,7 @@ class IPCServer:
         }
 
     def _run_command(self, command: str) -> List[Dict[str, Any]]:
-        """Execute a command.
+        """Execute a command by publishing it to the event bus.
 
         Args:
             command: Command string to execute
@@ -508,6 +508,9 @@ class IPCServer:
         Returns:
             List with command result
         """
+        from pubsub import pub
+        from . import topics
+
         # Parse workspace switching commands
         # Waybar sends: workspace "X" or workspace X or workspace number X
         parts = command.split()
@@ -518,9 +521,9 @@ class IPCServer:
             try:
                 ws_num = int(ws_num_str)
                 if 1 <= ws_num <= self.wm.config.num_workspaces:
-                    # Switch to workspace
-                    print(f"IPC: Switching to workspace {ws_num}")
-                    self.wm._switch_workspace(ws_num)
+                    # Publish command event instead of calling directly
+                    print(f"IPC: Publishing CMD_SWITCH_WORKSPACE for workspace {ws_num}")
+                    pub.sendMessage(topics.CMD_SWITCH_WORKSPACE, workspace_id=ws_num)
                     return [{"success": True}]
                 else:
                     return [
@@ -536,6 +539,22 @@ class IPCServer:
                         "error": f"Invalid workspace number: {ws_num_str}",
                     }
                 ]
+
+        # Map other i3/sway commands to our command events
+        command_map = {
+            "kill": topics.CMD_CLOSE_WINDOW,
+            "fullscreen": topics.CMD_TOGGLE_FULLSCREEN,
+            "focus next": topics.CMD_FOCUS_NEXT,
+            "focus prev": topics.CMD_FOCUS_PREV,
+            "swap next": topics.CMD_SWAP_NEXT,
+            "swap prev": topics.CMD_SWAP_PREV,
+            "layout toggle": topics.CMD_CYCLE_LAYOUT,
+        }
+
+        if command in command_map:
+            print(f"IPC: Publishing {command_map[command]} for command: {command}")
+            pub.sendMessage(command_map[command])
+            return [{"success": True}]
 
         # Unknown command
         return [{"success": False, "error": f"Unknown command: {command}"}]
