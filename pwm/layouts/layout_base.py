@@ -159,9 +159,24 @@ class Workspace:
 class LayoutManager:
     """
     Manages layouts for multiple outputs and workspaces.
+
+    This component subscribes to window/output lifecycle events and layout command events.
+    It publishes WORKSPACE_SWITCHED and LAYOUT_CHANGED events.
+
+    Responsibilities:
+    - Manage workspaces and window placement
+    - Handle window and output lifecycle
+    - CMD_CYCLE_LAYOUT: Cycle through available layouts
+    - CMD_CYCLE_LAYOUT_REVERSE: Cycle layouts in reverse
+    - CMD_SWAP_NEXT/PREV: Swap windows within workspace
+    - CMD_PROMOTE: Promote window to master
+    - CMD_SWITCH_WORKSPACE: Switch to workspace
+    - CMD_MOVE_TO_WORKSPACE: Move window to workspace
+    - CMD_CYCLE_TAB_FORWARD/BACKWARD: Cycle tabs (for tabbed layout)
     """
 
-    def __init__(self, layouts: Optional[List[Layout]] = None):
+    def __init__(self, bus, layouts: Optional[List[Layout]] = None):
+        self.bus = bus
         self.outputs: Dict[int, "Output"] = {}
         self.workspaces: Dict[int, Dict[int, Workspace]] = (
             {}
@@ -201,6 +216,60 @@ class LayoutManager:
             b=0x5294E2,
             a=0xFFFFFFFF,
         )
+
+        # Track focused output via bus
+        self.focused_output: Optional["Output"] = None
+
+        self._setup_subscriptions()
+
+    def _setup_subscriptions(self):
+        """Subscribe to events LayoutManager cares about."""
+        from pubsub import pub
+        from .. import topics
+
+        # Notification events
+        pub.subscribe(self._on_window_created, topics.WINDOW_CREATED)
+        pub.subscribe(self._on_window_closed, topics.WINDOW_CLOSED)
+        pub.subscribe(self._on_output_created, topics.OUTPUT_CREATED)
+        pub.subscribe(self._on_output_removed, topics.OUTPUT_REMOVED)
+
+        # Focus state (to track focused output)
+        pub.subscribe(self._on_focused_output_changed, topics.FOCUSED_OUTPUT_CHANGED)
+
+        # Layout command events
+        pub.subscribe(self._on_cycle_layout, topics.CMD_CYCLE_LAYOUT)
+        pub.subscribe(self._on_cycle_layout_reverse, topics.CMD_CYCLE_LAYOUT_REVERSE)
+        pub.subscribe(self._on_swap_next, topics.CMD_SWAP_NEXT)
+        pub.subscribe(self._on_swap_prev, topics.CMD_SWAP_PREV)
+        pub.subscribe(self._on_promote, topics.CMD_PROMOTE)
+        pub.subscribe(self._on_cycle_tab_forward, topics.CMD_CYCLE_TAB_FORWARD)
+        pub.subscribe(self._on_cycle_tab_backward, topics.CMD_CYCLE_TAB_BACKWARD)
+
+        # Workspace command events
+        pub.subscribe(self._on_switch_workspace, topics.CMD_SWITCH_WORKSPACE)
+        pub.subscribe(self._on_move_to_workspace, topics.CMD_MOVE_TO_WORKSPACE)
+
+    def _on_focused_output_changed(self, output):
+        """Track focused output from FocusManager."""
+        self.focused_output = output
+
+    def _on_output_created(self, output: "Output"):
+        """Handle OUTPUT_CREATED event."""
+        self.add_output(output)
+
+    def _on_output_removed(self, output: "Output"):
+        """Handle OUTPUT_REMOVED event."""
+        self.remove_output(output)
+
+    def _on_window_created(self, window: "Window"):
+        """Handle WINDOW_CREATED event."""
+        # Add to active workspace on focused output
+        output = self.focused_output if self.focused_output else None
+        self.add_window(window, output)
+
+    def _on_window_closed(self, window: "Window"):
+        """Handle WINDOW_CLOSED event."""
+        self.remove_window(window)
 
     def add_output(self, output: "Output"):
         """Add an output to manage."""
@@ -261,9 +330,21 @@ class LayoutManager:
 
     def switch_workspace(self, output: "Output", workspace_id: int):
         """Switch to a different workspace."""
+        from pubsub import pub
+        from .. import topics
+
         output_id = output.object_id
         if output_id in self.workspaces and workspace_id in self.workspaces[output_id]:
+            old_workspace = self.active_workspace.get(output_id, 1)
             self.active_workspace[output_id] = workspace_id
+
+            # Publish workspace switch event
+            pub.sendMessage(
+                topics.WORKSPACE_SWITCHED,
+                current_workspace=workspace_id,
+                old_workspace=old_workspace,
+                output_name=output.name if hasattr(output, "name") else str(output_id),
+            )
 
     def move_window_to_workspace(self, window: "Window", workspace_id: int):
         """Move a window to a different workspace."""
@@ -283,6 +364,9 @@ class LayoutManager:
 
     def cycle_layout(self, output: "Output", direction: int = 1):
         """Cycle through available layouts."""
+        from pubsub import pub
+        from .. import topics
+
         workspace = self.get_active_workspace(output)
         if workspace is None:
             return
@@ -302,6 +386,9 @@ class LayoutManager:
         new_idx = (current_idx + direction) % len(self.layouts)
         # Use the layout instance from self.layouts
         workspace.layout = self.layouts[new_idx]
+
+        # Publish layout change event
+        pub.sendMessage(topics.LAYOUT_CHANGED, layout_name=workspace.layout.name)
 
     def calculate_layout(self, output: "Output") -> Dict["Window", LayoutGeometry]:
         """Calculate the layout for an output."""
@@ -327,3 +414,70 @@ class LayoutManager:
             )
         else:
             return workspace.layout.calculate(workspace.windows, area)
+
+    # Command event handlers
+    def _on_cycle_layout(self):
+        """Handle CMD_CYCLE_LAYOUT command."""
+        if self.focused_output:
+            self.cycle_layout(self.focused_output, direction=1)
+
+    def _on_cycle_layout_reverse(self):
+        """Handle CMD_CYCLE_LAYOUT_REVERSE command."""
+        if self.focused_output:
+            self.cycle_layout(self.focused_output, direction=-1)
+
+    def _on_swap_next(self):
+        """Handle CMD_SWAP_NEXT command."""
+        if self.focused_output:
+            workspace = self.get_active_workspace(self.focused_output)
+            if workspace:
+                workspace.swap_next()
+
+    def _on_swap_prev(self):
+        """Handle CMD_SWAP_PREV command."""
+        if self.focused_output:
+            workspace = self.get_active_workspace(self.focused_output)
+            if workspace:
+                workspace.swap_prev()
+
+    def _on_promote(self):
+        """Handle CMD_PROMOTE command."""
+        if self.focused_output:
+            workspace = self.get_active_workspace(self.focused_output)
+            if workspace:
+                workspace.promote()
+
+    def _on_cycle_tab_forward(self):
+        """Handle CMD_CYCLE_TAB_FORWARD command."""
+        if self.focused_output:
+            workspace = self.get_active_workspace(self.focused_output)
+            if workspace:
+                workspace.cycle_tabs_forward()
+
+    def _on_cycle_tab_backward(self):
+        """Handle CMD_CYCLE_TAB_BACKWARD command."""
+        if self.focused_output:
+            workspace = self.get_active_workspace(self.focused_output)
+            if workspace:
+                workspace.cycle_tabs_backward()
+
+    def _on_switch_workspace(self, workspace_id):
+        """Handle CMD_SWITCH_WORKSPACE command."""
+        if self.focused_output:
+            self.switch_workspace(self.focused_output, workspace_id)
+
+    def _on_move_to_workspace(self, workspace_id):
+        """Handle CMD_MOVE_TO_WORKSPACE command.
+
+        Args:
+            workspace_id: The workspace to move the focused window to
+        """
+        from pubsub import pub
+        from .. import topics
+
+        # Get focused window from the bus - we'll need it from FocusManager
+        # For now, get it from the active workspace
+        if self.focused_output:
+            workspace = self.get_active_workspace(self.focused_output)
+            if workspace and workspace.focused_window:
+                self.move_window_to_workspace(workspace.focused_window, workspace_id)
