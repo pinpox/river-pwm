@@ -299,11 +299,16 @@ class TabDecoration:
         windows: List["Window"],
         focused_window: Optional["Window"],
     ):
-        """Render vertical tabs with rotated text."""
+        """Render vertical tabs with rotated text and control buttons."""
         import math
 
         num_tabs = len(windows)
         tab_height = self.height // num_tabs if num_tabs > 0 else self.height
+
+        # Button configuration
+        button_size = 16  # Size of each button
+        button_padding = 4  # Padding between buttons
+        buttons_area_height = button_size + button_padding * 2  # Total height for buttons at top
 
         for i, window in enumerate(windows):
             y = i * tab_height
@@ -326,6 +331,17 @@ class TabDecoration:
                 ctx.line_to(width, y + tab_height)
                 ctx.stroke()
 
+            # Draw control buttons at the top of each tab (close, minimize, maximize)
+            # Only show buttons if tab is tall enough
+            if tab_height > buttons_area_height + 40:  # Need space for buttons + some text
+                self._draw_tab_buttons(ctx, width, y, button_size, button_padding, is_focused)
+                # Adjust available space for title
+                title_start_y = y + buttons_area_height
+                title_available_height = tab_height - buttons_area_height - 10
+            else:
+                title_start_y = y + 5
+                title_available_height = tab_height - 10
+
             # Draw title (rotated 90 degrees counterclockwise)
             title = window.title or "Untitled"
             self._set_cairo_color(ctx, self.style.text_color)
@@ -334,15 +350,14 @@ class TabDecoration:
             )
             ctx.set_font_size(12)
 
-            # Truncate title if too long for tab height
+            # Truncate title if too long for available height
             text_extents = ctx.text_extents(title)
-            max_text_height = tab_height - 10  # Account for padding
-            if text_extents.width > max_text_height:
+            if text_extents.width > title_available_height:
                 # Binary search for right length
                 left, right = 0, len(title)
                 ellipsis = "..."
                 ellipsis_width = ctx.text_extents(ellipsis).width
-                available = max_text_height - ellipsis_width
+                available = title_available_height - ellipsis_width
 
                 while left < right:
                     mid = (left + right + 1) // 2
@@ -357,12 +372,12 @@ class TabDecoration:
             # Rotate and position text
             text_extents = ctx.text_extents(title)
 
-            # Save context, translate to center of tab, rotate, draw text
+            # Save context, translate to center of available space, rotate, draw text
             ctx.save()
 
-            # Move to center of tab
+            # Move to center of available text area
             text_center_x = width / 2
-            text_center_y = y + tab_height / 2
+            text_center_y = title_start_y + title_available_height / 2
             ctx.translate(text_center_x, text_center_y)
 
             # Rotate 90 degrees counterclockwise (text runs from bottom to top)
@@ -373,6 +388,56 @@ class TabDecoration:
             ctx.show_text(title)
 
             ctx.restore()
+
+    def _draw_tab_buttons(
+        self,
+        ctx: cairo.Context,
+        width: int,
+        y_offset: int,
+        button_size: int,
+        padding: int,
+        is_focused: bool,
+    ):
+        """Draw close, minimize, and maximize buttons for a tab.
+
+        Buttons are arranged horizontally at the top of the tab.
+        Layout: [close] [minimize] [maximize] (left to right)
+        """
+        # Button positions (centered horizontally in tab)
+        total_buttons_width = 3 * button_size + 2 * padding
+        start_x = (width - total_buttons_width) // 2
+        button_y = y_offset + padding
+
+        # Set button color
+        button_color = self.style.text_color if hasattr(self.style, 'button_color') else self.style.text_color
+
+        ctx.set_line_width(1.5)
+
+        # Close button (red X)
+        close_x = start_x
+        ctx.set_source_rgba(0.8, 0.2, 0.2, 1.0)  # Red
+        # Draw X
+        icon_padding = 3
+        ctx.move_to(close_x + icon_padding, button_y + icon_padding)
+        ctx.line_to(close_x + button_size - icon_padding, button_y + button_size - icon_padding)
+        ctx.stroke()
+        ctx.move_to(close_x + button_size - icon_padding, button_y + icon_padding)
+        ctx.line_to(close_x + icon_padding, button_y + button_size - icon_padding)
+        ctx.stroke()
+
+        # Minimize button (horizontal line)
+        minimize_x = start_x + button_size + padding
+        self._set_cairo_color(ctx, button_color)
+        y_center = button_y + button_size // 2
+        ctx.move_to(minimize_x + 3, y_center)
+        ctx.line_to(minimize_x + button_size - 3, y_center)
+        ctx.stroke()
+
+        # Maximize button (square)
+        maximize_x = start_x + 2 * (button_size + padding)
+        self._set_cairo_color(ctx, button_color)
+        ctx.rectangle(maximize_x + 3, button_y + 3, button_size - 6, button_size - 6)
+        ctx.stroke()
 
     def _set_cairo_color(self, ctx: cairo.Context, color: Tuple[int, int, int, int]):
         """Set Cairo color from RGBA tuple (0-255 values)."""

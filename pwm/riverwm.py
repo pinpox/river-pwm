@@ -572,10 +572,6 @@ class RiverWM:
                 width = max(1, geom.width)
                 height = max(1, geom.height)
 
-                # Adjust height for decorations if enabled
-                if window.use_ssd_enabled:
-                    height = max(1, height - self.config.ssd_height)
-
                 window.propose_dimensions(width, height)
                 window.set_tiled(geom.tiled_edges)
 
@@ -593,20 +589,12 @@ class RiverWM:
 
             geometries = self.layout_manager.calculate_layout(self.focused_output)
 
-            # Check if we're in tabbed layout
-            is_tabbed = workspace.layout.name == "tabbed"
-
             # Track z-order
             prev_node = None
             for window, geom in geometries.items():
                 node = window.get_node()
 
-                # Adjust position for top decorations
-                y = geom.y
-                if window.use_ssd_enabled and self.config.ssd_position.value == "top":
-                    y = geom.y + self.config.ssd_height
-
-                node.set_position(geom.x, y)
+                node.set_position(geom.x, geom.y)
 
                 # Stack windows
                 if prev_node:
@@ -626,32 +614,24 @@ class RiverWM:
                         self._make_border_config(self.config.border_color)
                     )
 
-                # Show/hide window based on layout
-                if is_tabbed:
-                    # In tabbed layout, only show focused window
-                    if window == workspace.focused_window:
-                        window.show()
-                    else:
-                        window.hide()
-                else:
-                    # In other layouts, show window
-                    window.show()
+                # All windows visible by default (layout can override via decorations)
+                window.show()
 
-                # Initialize/update window decorations (SSD)
-                if window.use_ssd_enabled:
-                    window.on_render_start()
-
-            # Render layout decorations (tab bar, etc.)
+            # Render layout decorations
+            # Layouts are responsible for ALL window decorations (titlebars, tabs, etc.)
             if workspace.layout.should_render_decorations():
                 # Create decorations if needed
                 if not hasattr(workspace.layout, "_decorations_created"):
                     from .decoration import DecorationStyle
 
                     style = DecorationStyle(
-                        height=30,
+                        height=self.config.ssd_height,
+                        position=self.config.ssd_position.value,
                         bg_color=self.config.ssd_background_color,
-                        focused_bg_color=self.config.focused_border_color,  # Use blue border color
+                        focused_bg_color=self.config.ssd_focused_background_color,
                         text_color=self.config.ssd_text_color,
+                        button_color=self.config.ssd_button_color,
+                        border_width=self.config.border_width,
                     )
                     workspace.layout.create_decorations(self.manager.connection, style)
                     workspace.layout._decorations_created = True
@@ -668,13 +648,6 @@ class RiverWM:
             for window in self.manager.windows.values():
                 if window not in visible_windows:
                     window.hide()
-
-        # Render decorations before finish
-        # This must happen BEFORE render_finish to synchronize commits
-        for window in self.manager.windows.values():
-            if window.use_ssd_enabled and window.is_visible:
-                is_focused = window == self.focused_window
-                window.on_render_finish(focused=is_focused)
 
         # Finish render sequence
         self.manager.render_finish()

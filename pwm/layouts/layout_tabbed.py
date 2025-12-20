@@ -62,7 +62,7 @@ class TabbedLayout(Layout):
         return "tabbed"
 
     def calculate(
-        self, windows: List["Window"], area: Area
+        self, windows: List["Window"], area: Area, focused_window: "Window" = None
     ) -> Dict["Window", LayoutGeometry]:
         if not windows:
             return {}
@@ -77,18 +77,27 @@ class TabbedLayout(Layout):
             area.height - 2 * self.gap,
         )
 
-        # All windows get same geometry (fullscreen minus tab bar)
+        # Create geometry for all windows
+        geometry = LayoutGeometry(
+            usable.x,
+            usable.y,
+            usable.width,
+            usable.height,
+            WindowEdges.TOP
+            | WindowEdges.BOTTOM
+            | WindowEdges.LEFT
+            | WindowEdges.RIGHT,
+        )
+
+        # Add windows to result, with focused window last (so it's on top)
+        # Dictionaries maintain insertion order in Python 3.7+
         for win in windows:
-            result[win] = LayoutGeometry(
-                usable.x,
-                usable.y,
-                usable.width,
-                usable.height,
-                WindowEdges.TOP
-                | WindowEdges.BOTTOM
-                | WindowEdges.LEFT
-                | WindowEdges.RIGHT,
-            )
+            if win != focused_window:
+                result[win] = geometry
+
+        # Add focused window last so it appears on top
+        if focused_window and focused_window in windows:
+            result[focused_window] = geometry
 
         return result
 

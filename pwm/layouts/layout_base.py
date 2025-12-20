@@ -316,4 +316,11 @@ class LayoutManager:
             if ls_area.width > 0 and ls_area.height > 0:
                 area = ls_area
 
-        return workspace.layout.calculate(workspace.windows, area)
+        # Pass focused_window to layout for stacking order
+        # Check if layout's calculate() accepts focused_window parameter
+        import inspect
+        sig = inspect.signature(workspace.layout.calculate)
+        if 'focused_window' in sig.parameters:
+            return workspace.layout.calculate(workspace.windows, area, workspace.focused_window)
+        else:
+            return workspace.layout.calculate(workspace.windows, area)

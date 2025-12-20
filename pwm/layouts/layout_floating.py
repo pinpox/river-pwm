@@ -75,3 +75,24 @@ class FloatingLayout(Layout):
         """Remove window from tracking."""
         self._positions.pop(window.object_id, None)
         self._sizes.pop(window.object_id, None)
+
+    # Decoration interface implementation
+    def should_render_decorations(self) -> bool:
+        return True
+
+    def create_decorations(self, connection, style):
+        """Create titlebar decorations for floating windows."""
+        from .default_window_decoration import DefaultWindowDecoration
+
+        self.window_decoration = DefaultWindowDecoration(connection, style)
+
+    def render_decorations(self, windows, focused_window, area):
+        """Render titlebar for each floating window."""
+        if hasattr(self, 'window_decoration') and self.window_decoration and windows:
+            self.window_decoration.render(windows, focused_window, area)
+
+    def cleanup_decorations(self):
+        """Clean up titlebar decorations."""
+        if hasattr(self, 'window_decoration') and self.window_decoration:
+            self.window_decoration.cleanup()
+            self.window_decoration = None
