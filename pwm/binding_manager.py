@@ -27,7 +27,8 @@ class KeyBinding:
 
     keysym: int
     modifiers: "Modifiers"
-    action: Callable
+    event_topic: str  # Event topic to publish (e.g., 'cmd.close_window')
+    event_data: dict  # Additional event parameters
 
 
 @dataclass
@@ -36,7 +37,8 @@ class PointerBinding:
 
     button: int
     modifiers: "Modifiers"
-    action: Callable
+    event_topic: str  # Event topic to publish
+    event_data: dict  # Additional event parameters
 
 
 class BindingManager:
@@ -55,123 +57,151 @@ class BindingManager:
         )  # seat_id -> bindings
 
     def bind_key(
-        self, seat: Seat, keysym: int, modifiers: "Modifiers", action: Callable
+        self, seat: Seat, keysym: int, modifiers: "Modifiers", event_topic: str, **event_data
     ):
-        """Create and enable a key binding.
+        """Create and enable a key binding that publishes a command event.
 
         Args:
             seat: The seat for this binding
             keysym: The key symbol
             modifiers: Modifier keys (Ctrl, Alt, etc.)
-            action: Callback function to execute when pressed
+            event_topic: The command event topic to publish (e.g., 'cmd.close_window')
+            **event_data: Optional data to pass with the event (e.g., workspace_id=3)
         """
+        from pubsub import pub
+
+        # Create a lambda that publishes the event
+        def publish_command():
+            pub.sendMessage(event_topic, **event_data)
+
         binding = self.manager.get_xkb_binding(seat, keysym, modifiers)
-        binding.on_pressed = action
+        binding.on_pressed = publish_command
         binding.enable()
 
         # Track binding
         if seat.object_id not in self.key_bindings:
             self.key_bindings[seat.object_id] = []
-        self.key_bindings[seat.object_id].append(KeyBinding(keysym, modifiers, action))
+        self.key_bindings[seat.object_id].append(
+            KeyBinding(keysym, modifiers, event_topic, event_data)
+        )
 
     def bind_pointer(
-        self, seat: Seat, button: int, modifiers: "Modifiers", action: Callable
+        self, seat: Seat, button: int, modifiers: "Modifiers", event_topic: str, **event_data
     ):
-        """Create and enable a pointer button binding.
+        """Create and enable a pointer button binding that publishes a command event.
 
         Args:
             seat: The seat for this binding
             button: Mouse button code
             modifiers: Modifier keys
-            action: Callback function to execute when pressed
+            event_topic: The command event topic to publish
+            **event_data: Optional data to pass with the event
         """
+        from pubsub import pub
+
+        # Create a lambda that publishes the event
+        # For pointer bindings, we need to pass the seat
+        def publish_command():
+            pub.sendMessage(event_topic, seat=seat, **event_data)
+
         binding = seat.get_pointer_binding(button, modifiers)
-        binding.on_pressed = action
+        binding.on_pressed = publish_command
         binding.enable()
 
         # Track binding
         if seat.object_id not in self.pointer_bindings:
             self.pointer_bindings[seat.object_id] = []
         self.pointer_bindings[seat.object_id].append(
-            PointerBinding(button, modifiers, action)
+            PointerBinding(button, modifiers, event_topic, event_data)
         )
 
     def setup_default_bindings(
         self,
         seat: Seat,
         mod: "Modifiers",
-        actions: Dict[str, Callable],
         config: Dict,
     ):
-        """Set up default window manager bindings.
+        """Set up default window manager bindings (now event-based).
 
         Args:
             seat: The seat to configure
             mod: Primary modifier key
-            actions: Dictionary mapping action names to callbacks
             config: Configuration dictionary with settings
         """
         from .protocol import Modifiers
+        from . import topics
 
         # XKB keysym values - import from parent module
         from .riverwm import XKB
 
         # Window management
-        self.bind_key(seat, XKB.q, mod | Modifiers.SHIFT, actions["quit"])
-        self.bind_key(seat, XKB.q, mod, actions["close_focused"])
+        self.bind_key(seat, XKB.q, mod | Modifiers.SHIFT, topics.CMD_QUIT)
+        self.bind_key(seat, XKB.q, mod, topics.CMD_CLOSE_WINDOW)
+        self.bind_key(seat, XKB.f, mod, topics.CMD_TOGGLE_FULLSCREEN)
 
         # Spawn applications
-        self.bind_key(seat, XKB.Return, mod, actions["spawn_terminal"])
-        self.bind_key(seat, XKB.d, mod, actions["spawn_launcher"])
+        self.bind_key(seat, XKB.Return, mod, topics.CMD_SPAWN_TERMINAL)
+        self.bind_key(seat, XKB.d, mod, topics.CMD_SPAWN_LAUNCHER)
 
         # Focus navigation
-        self.bind_key(seat, XKB.j, mod, actions["focus_next"])
-        self.bind_key(seat, XKB.k, mod, actions["focus_prev"])
-        self.bind_key(seat, XKB.Down, mod, actions["focus_next"])
-        self.bind_key(seat, XKB.Up, mod, actions["focus_prev"])
+        self.bind_key(seat, XKB.j, mod, topics.CMD_FOCUS_NEXT)
+        self.bind_key(seat, XKB.k, mod, topics.CMD_FOCUS_PREV)
+        self.bind_key(seat, XKB.Down, mod, topics.CMD_FOCUS_NEXT)
+        self.bind_key(seat, XKB.Up, mod, topics.CMD_FOCUS_PREV)
 
         # Swap windows
-        self.bind_key(seat, XKB.j, mod | Modifiers.SHIFT, actions["swap_next"])
-        self.bind_key(seat, XKB.k, mod | Modifiers.SHIFT, actions["swap_prev"])
+        self.bind_key(seat, XKB.j, mod | Modifiers.SHIFT, topics.CMD_SWAP_NEXT)
+        self.bind_key(seat, XKB.k, mod | Modifiers.SHIFT, topics.CMD_SWAP_PREV)
 
         # Promote to master
-        self.bind_key(seat, XKB.Return, mod | Modifiers.SHIFT, actions["promote"])
+        self.bind_key(seat, XKB.Return, mod | Modifiers.SHIFT, topics.CMD_PROMOTE)
 
         # Cycle layouts
-        self.bind_key(seat, XKB.space, mod, actions["cycle_layout"])
+        self.bind_key(seat, XKB.space, mod, topics.CMD_CYCLE_LAYOUT)
         self.bind_key(
-            seat, XKB.space, mod | Modifiers.SHIFT, actions["cycle_layout_reverse"]
+            seat, XKB.space, mod | Modifiers.SHIFT, topics.CMD_CYCLE_LAYOUT_REVERSE
         )
 
-        # Toggle fullscreen
-        self.bind_key(seat, XKB.f, mod, actions["toggle_fullscreen"])
-
         # Tab cycling (for tabbed layout)
-        self.bind_key(seat, XKB.Tab, mod, actions["cycle_tab_forward"])
+        self.bind_key(seat, XKB.Tab, mod, topics.CMD_CYCLE_TAB_FORWARD)
         self.bind_key(
-            seat, XKB.Tab, mod | Modifiers.SHIFT, actions["cycle_tab_backward"]
+            seat, XKB.Tab, mod | Modifiers.SHIFT, topics.CMD_CYCLE_TAB_BACKWARD
         )
 
         # Workspace bindings: Mod+1-9
         num_workspaces = config.get("num_workspaces", 9)
         for i in range(1, num_workspaces + 1):
             keysym = getattr(XKB, f"_{i}")
-            ws_id = i
             # Switch to workspace
             self.bind_key(
-                seat, keysym, mod, lambda ws=ws_id: actions["switch_workspace"](ws)
+                seat, keysym, mod,
+                topics.CMD_SWITCH_WORKSPACE,
+                workspace_id=i
             )
             # Move window to workspace
             self.bind_key(
-                seat,
-                keysym,
-                mod | Modifiers.SHIFT,
-                lambda ws=ws_id: actions["move_to_workspace"](ws),
+                seat, keysym, mod | Modifiers.SHIFT,
+                topics.CMD_MOVE_TO_WORKSPACE,
+                workspace_id=i
             )
 
         # Pointer bindings
-        self.bind_pointer(seat, BTN.LEFT, mod, actions["move_binding_pressed"])
-        self.bind_pointer(seat, BTN.RIGHT, mod, actions["resize_binding_pressed"])
+        self.bind_pointer(seat, BTN.LEFT, mod, topics.CMD_START_MOVE)
+        self.bind_pointer(seat, BTN.RIGHT, mod, topics.CMD_START_RESIZE)
+
+    def setup_custom_bindings(self, seat: Seat, custom_bindings: list):
+        """Set up user-defined custom keybindings.
+
+        Args:
+            seat: The seat to configure
+            custom_bindings: List of (keysym, modifiers, event_topic, event_data) tuples
+        """
+        if not custom_bindings:
+            return
+
+        for binding in custom_bindings:
+            keysym, modifiers, event_topic, event_data = binding
+            self.bind_key(seat, keysym, modifiers, event_topic, **event_data)
 
     def cleanup_seat(self, seat: Seat):
         """Clean up bindings for a removed seat.
