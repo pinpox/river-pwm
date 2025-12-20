@@ -88,11 +88,11 @@ class FloatingLayout(Layout):
 
     def render_decorations(self, windows, focused_window, area):
         """Render titlebar for each floating window."""
-        if hasattr(self, 'window_decoration') and self.window_decoration and windows:
+        if hasattr(self, "window_decoration") and self.window_decoration and windows:
             self.window_decoration.render(windows, focused_window, area)
 
     def cleanup_decorations(self):
         """Clean up titlebar decorations."""
-        if hasattr(self, 'window_decoration') and self.window_decoration:
+        if hasattr(self, "window_decoration") and self.window_decoration:
             self.window_decoration.cleanup()
             self.window_decoration = None

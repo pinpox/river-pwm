@@ -50,7 +50,9 @@ class DefaultWindowDecoration:
         current_window_ids = {w.object_id for w in windows}
         for window_id in list(self.window_decorations.keys()):
             if window_id not in current_window_ids:
-                print(f"DefaultWindowDecoration: Removing decoration for window {window_id}")
+                print(
+                    f"DefaultWindowDecoration: Removing decoration for window {window_id}"
+                )
                 self._cleanup_window_decoration(window_id)
 
         # Render and commit for each window
@@ -182,7 +184,9 @@ class DefaultWindowDecoration:
                 dec["surface"].commit()
 
         except Exception as e:
-            print(f"DefaultWindowDecoration: Error rendering window {window.object_id}: {e}")
+            print(
+                f"DefaultWindowDecoration: Error rendering window {window.object_id}: {e}"
+            )
 
     def _cleanup_window_decoration(self, window_id: int):
         """Clean up decoration for a specific window."""

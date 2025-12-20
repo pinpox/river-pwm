@@ -215,9 +215,54 @@
       # Formatter for `nix fmt`
       formatter = forAllSystems (system: treefmtEval.${system}.config.build.wrapper);
 
+      # Development shell with pytest
+      devShells = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgsFor.${system};
+        in
+        {
+          default = pkgs.mkShell {
+            buildInputs = [
+              pkgs.python3Packages.pytest
+              pkgs.python3Packages.pycairo
+              self.packages.${system}.pwm-lib
+            ];
+          };
+        }
+      );
+
       # Format checks for CI
-      checks = forAllSystems (system: {
-        formatting = treefmtEval.${system}.config.build.check self;
-      });
+      checks = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgsFor.${system};
+        in
+        {
+          formatting = treefmtEval.${system}.config.build.check self;
+
+          # Pytest unit tests
+          pytest = pkgs.stdenv.mkDerivation {
+            name = "pwm-pytest";
+            src = ./.;
+
+            nativeBuildInputs = [
+              pkgs.python3Packages.pytest
+              pkgs.python3Packages.pycairo
+              self.packages.${system}.pwm-lib
+            ];
+
+            buildPhase = ''
+              export HOME=$(mktemp -d)
+              pytest tests/ -v --tb=short -m unit
+            '';
+
+            installPhase = ''
+              mkdir -p $out
+              echo "All tests passed" > $out/test-results.txt
+            '';
+          };
+        }
+      );
     };
 }

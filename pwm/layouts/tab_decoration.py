@@ -308,7 +308,9 @@ class TabDecoration:
         # Button configuration
         button_size = 16  # Size of each button
         button_padding = 4  # Padding between buttons
-        buttons_area_height = button_size + button_padding * 2  # Total height for buttons at top
+        buttons_area_height = (
+            button_size + button_padding * 2
+        )  # Total height for buttons at top
 
         for i, window in enumerate(windows):
             y = i * tab_height
@@ -333,8 +335,12 @@ class TabDecoration:
 
             # Draw control buttons at the top of each tab (close, minimize, maximize)
             # Only show buttons if tab is tall enough
-            if tab_height > buttons_area_height + 40:  # Need space for buttons + some text
-                self._draw_tab_buttons(ctx, width, y, button_size, button_padding, is_focused)
+            if (
+                tab_height > buttons_area_height + 40
+            ):  # Need space for buttons + some text
+                self._draw_tab_buttons(
+                    ctx, width, y, button_size, button_padding, is_focused
+                )
                 # Adjust available space for title
                 title_start_y = y + buttons_area_height
                 title_available_height = tab_height - buttons_area_height - 10
@@ -409,7 +415,11 @@ class TabDecoration:
         button_y = y_offset + padding
 
         # Set button color
-        button_color = self.style.text_color if hasattr(self.style, 'button_color') else self.style.text_color
+        button_color = (
+            self.style.text_color
+            if hasattr(self.style, "button_color")
+            else self.style.text_color
+        )
 
         ctx.set_line_width(1.5)
 
@@ -419,7 +429,9 @@ class TabDecoration:
         # Draw X
         icon_padding = 3
         ctx.move_to(close_x + icon_padding, button_y + icon_padding)
-        ctx.line_to(close_x + button_size - icon_padding, button_y + button_size - icon_padding)
+        ctx.line_to(
+            close_x + button_size - icon_padding, button_y + button_size - icon_padding
+        )
         ctx.stroke()
         ctx.move_to(close_x + button_size - icon_padding, button_y + icon_padding)
         ctx.line_to(close_x + icon_padding, button_y + button_size - icon_padding)

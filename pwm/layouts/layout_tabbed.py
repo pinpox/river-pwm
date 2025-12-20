@@ -83,10 +83,7 @@ class TabbedLayout(Layout):
             usable.y,
             usable.width,
             usable.height,
-            WindowEdges.TOP
-            | WindowEdges.BOTTOM
-            | WindowEdges.LEFT
-            | WindowEdges.RIGHT,
+            WindowEdges.TOP | WindowEdges.BOTTOM | WindowEdges.LEFT | WindowEdges.RIGHT,
         )
 
         # Add windows to result, with focused window last (so it's on top)

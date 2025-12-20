@@ -24,6 +24,8 @@ from .layouts import (
     LayoutDirection,
 )
 from .protocol import Modifiers, WindowEdges, WindowCapabilities, BorderConfig
+from .operation_manager import OperationManager, OpType
+from .focus_manager import FocusManager
 
 
 # XKB keysym values (from xkbcommon-keysyms.h)
@@ -214,14 +216,6 @@ class RiverConfig:
         ]
 
 
-class OpType(Enum):
-    """Interactive operation types."""
-
-    NONE = auto()
-    MOVE = auto()
-    RESIZE = auto()
-
-
 class RiverWM:
     """
     River Window Manager
@@ -242,9 +236,14 @@ class RiverWM:
         self.layout_manager.border_width = self.config.border_width
         self.layout_manager.num_workspaces = self.config.num_workspaces
 
-        # Active state
-        self.focused_window: Optional[Window] = None
-        self.focused_output: Optional[Output] = None
+        # Focus management (delegated to FocusManager)
+        self.focus_manager = FocusManager(
+            get_window_workspace_fn=self._get_window_workspace,
+            get_active_workspace_fn=lambda output: self.layout_manager.get_active_workspace(
+                output
+            ),
+            focus_follows_mouse=self.config.focus_follows_mouse,
+        )
 
         # IPC server
         from .ipc import IPCServer
@@ -252,18 +251,33 @@ class RiverWM:
         self.ipc = IPCServer(self)
         self.manager.ipc_poll_callback = self.ipc.poll
 
-        # Interactive operations
-        self.op_type = OpType.NONE
-        self.op_window: Optional[Window] = None
-        self.op_seat: Optional[Seat] = None
-        self.op_start_x: int = 0
-        self.op_start_y: int = 0
-        self.op_start_width: int = 0
-        self.op_start_height: int = 0
-        self.op_resize_edges: WindowEdges = WindowEdges.NONE
+        # Interactive operations (delegated to OperationManager)
+        self.operation_manager = OperationManager(
+            get_window_workspace_fn=self._get_window_workspace
+        )
 
         # Set up callbacks
         self._setup_callbacks()
+
+    @property
+    def focused_window(self):
+        """Get the currently focused window (delegates to FocusManager)."""
+        return self.focus_manager.focused_window
+
+    @focused_window.setter
+    def focused_window(self, value):
+        """Set the focused window (delegates to FocusManager)."""
+        self.focus_manager.set_focused_window(value)
+
+    @property
+    def focused_output(self):
+        """Get the currently focused output (delegates to FocusManager)."""
+        return self.focus_manager.focused_output
+
+    @focused_output.setter
+    def focused_output(self, value):
+        """Set the focused output (delegates to FocusManager)."""
+        self.focus_manager.set_focused_output(value)
 
     def _setup_callbacks(self):
         """Set up window manager callbacks."""
@@ -367,17 +381,15 @@ class RiverWM:
 
     def _on_seat_removed(self, seat: Seat):
         """Handle seat removed."""
-        if self.op_seat == seat:
-            self.op_type = OpType.NONE
-            self.op_window = None
-            self.op_seat = None
+        # End any operation from this seat
+        self.operation_manager.end_operation(seat)
 
     def _on_pointer_enter(self, seat: Seat, window: Window):
-        """Handle pointer entering a window."""
-        if self.config.focus_follows_mouse and self.op_type == OpType.NONE:
-            self.focused_window = window
-            # Focus will be applied in next manage sequence
-            self.manager.manage_dirty()
+        """Handle pointer entering a window (delegates to FocusManager)."""
+        self.focus_manager.handle_pointer_enter(
+            window, self.operation_manager.is_active()
+        )
+        self.manager.manage_dirty()
 
     def _on_window_interaction(self, seat: Seat, window: Window):
         """Handle window interaction (click)."""
@@ -388,59 +400,20 @@ class RiverWM:
             workspace.focused_window = window
 
     def _on_op_delta(self, seat: Seat, dx: int, dy: int):
-        """Handle operation delta."""
-        if self.op_type == OpType.NONE or self.op_window is None:
-            return
-
-        if self.op_type == OpType.MOVE:
-            # Update position in floating layout
-            workspace = self._get_window_workspace(self.op_window)
-            if workspace and isinstance(workspace.layout, FloatingLayout):
-                new_x = self.op_start_x + dx
-                new_y = self.op_start_y + dy
-                workspace.layout.set_position(self.op_window, new_x, new_y)
-
-        elif self.op_type == OpType.RESIZE:
-            workspace = self._get_window_workspace(self.op_window)
-            if workspace:
-                new_width = self.op_start_width
-                new_height = self.op_start_height
-                new_x = self.op_start_x
-                new_y = self.op_start_y
-
-                if self.op_resize_edges & WindowEdges.RIGHT:
-                    new_width = max(100, self.op_start_width + dx)
-                elif self.op_resize_edges & WindowEdges.LEFT:
-                    new_width = max(100, self.op_start_width - dx)
-                    new_x = self.op_start_x + self.op_start_width - new_width
-
-                if self.op_resize_edges & WindowEdges.BOTTOM:
-                    new_height = max(100, self.op_start_height + dy)
-                elif self.op_resize_edges & WindowEdges.TOP:
-                    new_height = max(100, self.op_start_height - dy)
-                    new_y = self.op_start_y + self.op_start_height - new_height
-
-                if isinstance(workspace.layout, FloatingLayout):
-                    workspace.layout.set_position(self.op_window, new_x, new_y)
-                    workspace.layout.set_size(self.op_window, new_width, new_height)
+        """Handle operation delta - delegated to OperationManager."""
+        self.operation_manager.handle_delta(seat, dx, dy)
 
     def _on_op_release(self, seat: Seat):
-        """Handle operation release."""
-        if self.op_window:
-            self.op_window.inform_resize_end()
-        self._end_operation(seat)
+        """Handle operation release - delegated to OperationManager."""
+        self.operation_manager.end_operation(seat)
 
     def _end_operation(self, seat: Seat):
-        """End an interactive operation."""
-        if self.op_seat == seat:
-            seat.op_end()
-            self.op_type = OpType.NONE
-            self.op_window = None
-            self.op_seat = None
+        """End an interactive operation - delegated to OperationManager."""
+        self.operation_manager.end_operation(seat)
 
     def _start_move(self, seat: Seat, window: Window):
         """Start an interactive move operation."""
-        if self.op_type != OpType.NONE:
+        if self.operation_manager.is_active():
             return
 
         # Switch to floating layout if not already
@@ -453,20 +426,12 @@ class RiverWM:
                 workspace.layout.set_position(win, geom.x, geom.y)
                 workspace.layout.set_size(win, geom.width, geom.height)
 
-        self.op_type = OpType.MOVE
-        self.op_window = window
-        self.op_seat = seat
-
-        # Get current position
-        node = window.get_node()
-        self.op_start_x = node.x
-        self.op_start_y = node.y
-
-        seat.op_start_pointer()
+        # Delegate to OperationManager
+        self.operation_manager.start_move(seat, window)
 
     def _start_resize(self, seat: Seat, window: Window, edges: WindowEdges):
         """Start an interactive resize operation."""
-        if self.op_type != OpType.NONE:
+        if self.operation_manager.is_active():
             return
 
         # Switch to floating layout if not already
@@ -479,20 +444,9 @@ class RiverWM:
                 workspace.layout.set_position(win, geom.x, geom.y)
                 workspace.layout.set_size(win, geom.width, geom.height)
 
-        self.op_type = OpType.RESIZE
-        self.op_window = window
-        self.op_seat = seat
-        self.op_resize_edges = edges
-
-        # Get current geometry
-        node = window.get_node()
-        self.op_start_x = node.x
-        self.op_start_y = node.y
-        self.op_start_width = window.width
-        self.op_start_height = window.height
-
         window.inform_resize_start()
-        seat.op_start_pointer()
+        # Delegate to OperationManager
+        self.operation_manager.start_resize(seat, window, edges)
 
     def _get_window_workspace(self, window: Window):
         """Get the workspace containing a window."""
@@ -794,22 +748,14 @@ class RiverWM:
             print(f"Failed to spawn {command}: {e}")
 
     def _focus_next(self):
-        """Focus the next window."""
-        if self.focused_output:
-            workspace = self.layout_manager.get_active_workspace(self.focused_output)
-            if workspace:
-                workspace.focus_next()
-                self.focused_window = workspace.focused_window
-                self.manager.manage_dirty()
+        """Focus the next window (delegates to FocusManager)."""
+        self.focus_manager.focus_next()
+        self.manager.manage_dirty()
 
     def _focus_prev(self):
-        """Focus the previous window."""
-        if self.focused_output:
-            workspace = self.layout_manager.get_active_workspace(self.focused_output)
-            if workspace:
-                workspace.focus_prev()
-                self.focused_window = workspace.focused_window
-                self.manager.manage_dirty()
+        """Focus the previous window (delegates to FocusManager)."""
+        self.focus_manager.focus_prev()
+        self.manager.manage_dirty()
 
     def _swap_next(self):
         """Swap focused window with next."""
