@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Optional, Callable
 if TYPE_CHECKING:
     from .objects import Window, Seat
     from .protocol import WindowEdges
-    from .layouts import FloatingLayout
 
 
 class OpType(Enum):
@@ -106,16 +105,10 @@ class OperationManager:
         if not workspace:
             return False
 
-        # Get size from floating layout if available
-        from .layouts import FloatingLayout
-
-        if isinstance(workspace.layout, FloatingLayout):
-            positions = workspace.layout._positions
-            sizes = workspace.layout._sizes
-            width = sizes.get(window.object_id, (800, 600))[0]
-            height = sizes.get(window.object_id, (800, 600))[1]
+        # Get size from window's floating_size or fallback
+        if window.floating_size:
+            width, height = window.floating_size
         else:
-            # Fallback to window dimensions
             width = window.width or 800
             height = window.height or 600
 
@@ -142,7 +135,6 @@ class OperationManager:
             dy: Y delta from operation start
         """
         from .protocol import WindowEdges
-        from .layouts import FloatingLayout
 
         if not self.current or self.current.seat != seat:
             return
@@ -152,11 +144,10 @@ class OperationManager:
             return
 
         if self.current.type == OpType.MOVE:
-            # Update position in floating layout
-            if isinstance(workspace.layout, FloatingLayout):
-                new_x = self.current.start_x + dx
-                new_y = self.current.start_y + dy
-                workspace.layout.set_position(self.current.window, new_x, new_y)
+            # Update position directly on window
+            new_x = self.current.start_x + dx
+            new_y = self.current.start_y + dy
+            self.current.window.floating_pos = (new_x, new_y)
 
         elif self.current.type == OpType.RESIZE and self.current.resize_edges:
             new_width = self.current.start_width
@@ -177,10 +168,9 @@ class OperationManager:
                 new_height = max(100, self.current.start_height - dy)
                 new_y = self.current.start_y + self.current.start_height - new_height
 
-            # Update floating layout
-            if isinstance(workspace.layout, FloatingLayout):
-                workspace.layout.set_position(self.current.window, new_x, new_y)
-                workspace.layout.set_size(self.current.window, new_width, new_height)
+            # Update window properties directly
+            self.current.window.floating_pos = (new_x, new_y)
+            self.current.window.floating_size = (new_width, new_height)
 
     def end_operation(self, seat: Seat):
         """End the current operation.

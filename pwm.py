@@ -13,7 +13,7 @@ from pwm import topics  # For custom keybindings  # noqa: F401
 # Uncomment to use custom layouts instead of defaults
 # from pwm import (
 #     TilingLayout, MonocleLayout, GridLayout,
-#     CenteredMasterLayout, FloatingLayout, TabbedLayout,
+#     CenteredMasterLayout, TabbedLayout,
 #     LayoutDirection
 # )
 #
@@ -24,7 +24,6 @@ from pwm import topics  # For custom keybindings  # noqa: F401
 #     TabbedLayout(gap=12, tab_width=200),  # NEW: Vertical tabbed layout on left
 #     GridLayout(gap=12),
 #     CenteredMasterLayout(gap=12),
-#     FloatingLayout(),
 # ]
 
 # Optional: Custom keybindings

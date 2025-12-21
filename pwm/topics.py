@@ -104,6 +104,13 @@ CMD_CYCLE_TAB_FORWARD = "cmd.cycle_tab_forward"
 CMD_CYCLE_TAB_BACKWARD = "cmd.cycle_tab_backward"
 """Command: Cycle to previous tab."""
 
+# Floating window commands
+CMD_TOGGLE_FLOATING = "cmd.toggle_floating"
+"""Command: Toggle floating state for focused window."""
+
+CMD_TOGGLE_ALL_FLOATING = "cmd.toggle_all_floating"
+"""Command: Toggle floating state for all windows in workspace."""
+
 # Workspace commands
 CMD_SWITCH_WORKSPACE = "cmd.switch_workspace"
 """Command: Switch to a workspace. Requires workspace_id parameter."""

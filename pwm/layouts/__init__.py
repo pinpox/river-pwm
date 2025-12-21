@@ -14,7 +14,6 @@ from .layout_base import (
 from .layout_tiling import TilingLayout
 from .layout_monocle import MonocleLayout
 from .layout_grid import GridLayout
-from .layout_floating import FloatingLayout
 from .layout_centered_master import CenteredMasterLayout
 from .layout_tabbed import TabbedLayout
 
@@ -29,7 +28,6 @@ __all__ = [
     "TilingLayout",
     "MonocleLayout",
     "GridLayout",
-    "FloatingLayout",
     "CenteredMasterLayout",
     "TabbedLayout",
 ]

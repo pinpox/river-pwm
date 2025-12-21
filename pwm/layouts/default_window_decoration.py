@@ -159,8 +159,16 @@ class DefaultWindowDecoration:
 
         try:
             # Update buffer if window width changed
-            # TODO: Get actual window width from geometry
-            # For now use stored width
+            # Use floating_size if available, otherwise use window.width
+            if window.floating_size:
+                window_width = window.floating_size[0]
+            else:
+                window_width = window.width if window.width > 0 else 800
+
+            # Resize decoration if needed (decoration extends over borders)
+            decoration_width = window_width + (self.style.border_width * 2)
+            if decoration_width != dec["width"]:
+                self._resize_decoration(window.object_id, decoration_width)
 
             # Get shared memory data
             shm_data = dec["pool"].get_data()
@@ -189,6 +197,43 @@ class DefaultWindowDecoration:
             print(
                 f"DefaultWindowDecoration: Error rendering window {window.object_id}: {e}"
             )
+
+    def _resize_decoration(self, window_id: int, new_width: int):
+        """Resize decoration buffer for a window.
+
+        Args:
+            window_id: Window object ID
+            new_width: New decoration width (including borders)
+        """
+        dec = self.window_decorations.get(window_id)
+        if not dec:
+            return
+
+        from ..shm import WlShm
+
+        # Destroy old buffer
+        if dec.get("buffer"):
+            try:
+                if hasattr(dec["buffer"], "destroy_request"):
+                    dec["buffer"].destroy_request()
+                else:
+                    dec["buffer"].destroy()
+            except Exception as e:
+                print(f"DefaultWindowDecoration: Error destroying old buffer: {e}")
+
+        # Create new buffer with updated width
+        stride = new_width * 4
+        size = stride * self.style.height
+
+        # Resize pool if needed (can only grow)
+        if dec["pool"].size < size:
+            dec["pool"].resize(size)
+
+        # Create new buffer
+        dec["buffer"] = dec["pool"].create_buffer(
+            0, new_width, self.style.height, stride, WlShm.FORMAT_ARGB8888
+        )
+        dec["width"] = new_width
 
     def _cleanup_window_decoration(self, window_id: int):
         """Clean up decoration for a specific window."""

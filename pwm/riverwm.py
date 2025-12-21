@@ -22,7 +22,6 @@ from .layouts import (
     TilingLayout,
     MonocleLayout,
     GridLayout,
-    FloatingLayout,
     CenteredMasterLayout,
     LayoutDirection,
 )
@@ -212,7 +211,6 @@ class RiverConfig:
             ),  # Auto-width vertical tabs
             GridLayout(gap=effective_gap),
             CenteredMasterLayout(gap=effective_gap),
-            FloatingLayout(),
         ]
 
 
@@ -365,6 +363,10 @@ class RiverWM:
         pub.subscribe(self._on_manage_start, topics.LIFECYCLE_MANAGE_START)
         pub.subscribe(self._on_render_start, topics.LIFECYCLE_RENDER_START)
 
+        # Subscribe to interactive operation commands
+        pub.subscribe(self._on_start_move, topics.CMD_START_MOVE)
+        pub.subscribe(self._on_start_resize, topics.CMD_START_RESIZE)
+
     def _on_window_created(self, window: Window):
         """Handle River-specific window setup.
 
@@ -378,6 +380,25 @@ class RiverWM:
             | WindowCapabilities.FULLSCREEN
             | WindowCapabilities.MINIMIZE
         )
+
+        # Smart detection: Auto-float dialogs/utilities
+        if window.should_auto_float():
+            window.is_floating = True
+            if self.focused_output:
+                # Count floating windows for cascade
+                workspace = self.layout_manager.get_active_workspace(
+                    self.focused_output
+                )
+                if workspace:
+                    cascade_count = sum(1 for w in workspace.windows if w.is_floating)
+                    area = self.focused_output.area
+                    if self.focused_output.layer_shell_output:
+                        ls_area = (
+                            self.focused_output.layer_shell_output.non_exclusive_area
+                        )
+                        if ls_area.width > 0 and ls_area.height > 0:
+                            area = ls_area
+                    window.initialize_floating(area, cascade_count)
 
         # Enable server-side decorations if configured
         if self.config.use_ssd:
@@ -459,20 +480,51 @@ class RiverWM:
         """End an interactive operation - delegated to OperationManager."""
         self.operation_manager.end_operation(seat)
 
+    def _on_start_move(self, seat: Seat):
+        """Handle CMD_START_MOVE command - start moving focused window."""
+        print("DEBUG: _on_start_move called")
+        if not self.focused_output:
+            print("DEBUG: No focused output")
+            return
+
+        workspace = self.layout_manager.get_active_workspace(self.focused_output)
+        if not workspace or not workspace.focused_window:
+            print("DEBUG: No workspace or focused window")
+            return
+
+        print(f"DEBUG: Starting move for window {workspace.focused_window.object_id}")
+        self._start_move(seat, workspace.focused_window)
+
+    def _on_start_resize(self, seat: Seat):
+        """Handle CMD_START_RESIZE command - start resizing focused window."""
+        from .protocol import WindowEdges
+
+        if not self.focused_output:
+            return
+
+        workspace = self.layout_manager.get_active_workspace(self.focused_output)
+        if not workspace or not workspace.focused_window:
+            return
+
+        # Default to bottom-right resize
+        self._start_resize(
+            seat, workspace.focused_window, WindowEdges.BOTTOM | WindowEdges.RIGHT
+        )
+
     def _start_move(self, seat: Seat, window: Window):
         """Start an interactive move operation."""
         if self.operation_manager.is_active():
             return
 
-        # Switch to floating layout if not already
-        workspace = self._get_window_workspace(window)
-        if workspace and not isinstance(workspace.layout, FloatingLayout):
-            workspace.layout = FloatingLayout()
-            # Initialize positions from current geometry
+        # Auto-float on move if not already floating
+        if not window.is_floating:
+            window.is_floating = True
+            # Initialize from current geometry
             geometries = self.layout_manager.calculate_layout(self.focused_output)
-            for win, geom in geometries.items():
-                workspace.layout.set_position(win, geom.x, geom.y)
-                workspace.layout.set_size(win, geom.width, geom.height)
+            if window in geometries:
+                geom = geometries[window]
+                window.floating_pos = (geom.x, geom.y)
+                window.floating_size = (geom.width, geom.height)
 
         # Delegate to OperationManager
         self.operation_manager.start_move(seat, window)
@@ -482,15 +534,14 @@ class RiverWM:
         if self.operation_manager.is_active():
             return
 
-        # Switch to floating layout if not already
-        workspace = self._get_window_workspace(window)
-        if workspace and not isinstance(workspace.layout, FloatingLayout):
-            workspace.layout = FloatingLayout()
-            # Initialize positions from current geometry
+        # Auto-float on resize
+        if not window.is_floating:
+            window.is_floating = True
             geometries = self.layout_manager.calculate_layout(self.focused_output)
-            for win, geom in geometries.items():
-                workspace.layout.set_position(win, geom.x, geom.y)
-                workspace.layout.set_size(win, geom.width, geom.height)
+            if window in geometries:
+                geom = geometries[window]
+                window.floating_pos = (geom.x, geom.y)
+                window.floating_size = (geom.width, geom.height)
 
         window.inform_resize_start()
         # Delegate to OperationManager
@@ -591,11 +642,16 @@ class RiverWM:
 
             geometries = self.layout_manager.calculate_layout(self.focused_output)
 
-            # Track z-order
-            prev_node = None
-            for window, geom in geometries.items():
-                node = window.get_node()
+            # Separate tiled and floating windows for z-ordering
+            tiled = [(w, g) for w, g in geometries.items() if not w.is_floating]
+            floating = [(w, g) for w, g in geometries.items() if w.is_floating]
 
+            # Track z-order for tiled windows
+            prev_node = None
+
+            # Render tiled windows first (bottom layer)
+            for window, geom in tiled:
+                node = window.get_node()
                 node.set_position(geom.x, geom.y)
 
                 # Stack windows
@@ -606,7 +662,6 @@ class RiverWM:
                 prev_node = node
 
                 # Set borders
-                # Always show borders on all edges regardless of tiling state
                 if window == self.focused_window:
                     window.set_borders(
                         self._make_border_config(self.config.focused_border_color)
@@ -616,7 +671,40 @@ class RiverWM:
                         self._make_border_config(self.config.border_color)
                     )
 
-                # All windows visible by default (layout can override via decorations)
+                # Render per-window decorations (for tiled windows if not using layout decorations)
+                window.on_render_start()
+
+                window.show()
+
+            # Render floating windows on top (always above tiled windows)
+            # Reset prev_node to ensure floating windows start above all tiled windows
+            prev_node = None
+            for window, geom in floating:
+                node = window.get_node()
+                node.set_position(geom.x, geom.y)
+
+                # Stack floating windows above all tiled windows
+                if prev_node:
+                    # Continue stacking within floating windows
+                    node.place_above(prev_node)
+                else:
+                    # First floating window goes on top
+                    node.place_top()
+                prev_node = node
+
+                # Set borders
+                if window == self.focused_window:
+                    window.set_borders(
+                        self._make_border_config(self.config.focused_border_color)
+                    )
+                else:
+                    window.set_borders(
+                        self._make_border_config(self.config.border_color)
+                    )
+
+                # Render per-window decorations for floating windows
+                window.on_render_start()
+
                 window.show()
 
             # Render layout decorations
@@ -638,12 +726,19 @@ class RiverWM:
                     workspace.layout.create_decorations(self.manager.connection, style)
                     workspace.layout._decorations_created = True
 
-                # Render decorations
+                # Render decorations only for tiled windows
+                # Filter out floating windows - they don't need layout decorations
+                tiled_windows = [w for w in workspace.windows if not w.is_floating]
                 workspace.layout.render_decorations(
-                    workspace.windows,
+                    tiled_windows,
                     workspace.focused_window,
                     self.focused_output.area,
                 )
+
+            # Commit per-window decorations
+            for window in workspace.windows:
+                is_focused = window == workspace.focused_window
+                window.on_render_finish(focused=is_focused)
 
             # Hide windows not in current workspace
             visible_windows = set(workspace.windows)

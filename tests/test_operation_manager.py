@@ -5,7 +5,6 @@ Unit tests for OperationManager.
 import pytest
 from pwm.operation_manager import OperationManager, OpType, Operation
 from pwm.protocol import WindowEdges, Area
-from pwm.layouts import FloatingLayout
 
 
 @pytest.mark.unit

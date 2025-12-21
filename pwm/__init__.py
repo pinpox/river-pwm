@@ -7,7 +7,7 @@ This package provides:
 - Protocol bindings for river-window-management-v1
 - Connection handling for Wayland sockets
 - Window, output, and seat management objects
-- Layout algorithms (tiling, monocle, grid, floating)
+- Layout algorithms (tiling, monocle, grid)
 - A complete window manager implementation
 
 Example usage:
@@ -62,7 +62,6 @@ from .layouts import (
     TilingLayout,
     MonocleLayout,
     GridLayout,
-    FloatingLayout,
     CenteredMasterLayout,
     TabbedLayout,
     Workspace,
@@ -113,7 +112,6 @@ __all__ = [
     "TilingLayout",
     "MonocleLayout",
     "GridLayout",
-    "FloatingLayout",
     "CenteredMasterLayout",
     "TabbedLayout",
     "Workspace",

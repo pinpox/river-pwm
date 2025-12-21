@@ -6,7 +6,7 @@ High-level Python objects representing River protocol objects.
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 from enum import Enum, auto
 
 from .protocol import (
@@ -79,6 +79,11 @@ class Window(ProtocolObject):
         self.state = WindowState.NORMAL
         self.fullscreen_output: Optional[Output] = None
         self.is_visible = True
+
+        # Floating state
+        self.is_floating: bool = False
+        self.floating_pos: Optional[Tuple[int, int]] = None  # (x, y)
+        self.floating_size: Optional[Tuple[int, int]] = None  # (width, height)
 
         # Node for rendering
         self.node: Optional[Node] = None
@@ -332,6 +337,58 @@ class Window(ProtocolObject):
                 focused=focused,
                 maximized=(self.state == WindowState.MAXIMIZED),
             )
+
+    def should_auto_float(self) -> bool:
+        """Determine if window should auto-float based on hints."""
+        # Client-side decorated windows (dialogs/utilities)
+        if self.decoration_hint == DecorationHint.ONLY_SUPPORTS_CSD:
+            return True
+        if self.decoration_hint == DecorationHint.PREFERS_CSD:
+            return True
+
+        # Check for dialog/utility app_ids
+        if self.app_id:
+            dialog_patterns = ["dialog", "popup", "menu", "tooltip", "notification"]
+            app_id_lower = self.app_id.lower()
+            if any(pattern in app_id_lower for pattern in dialog_patterns):
+                return True
+
+        # Check window title for dialog indicators
+        if self.title:
+            title_lower = self.title.lower()
+            if any(
+                word in title_lower for word in ["dialog", "preferences", "settings"]
+            ):
+                return True
+
+        # Has a parent window (likely a dialog)
+        if self.parent:
+            return True
+
+        return False
+
+    def initialize_floating(self, area, cascade_count: int = 0):
+        """Initialize floating position and size.
+
+        Args:
+            area: Available area for positioning
+            cascade_count: Number of floating windows (for cascade offset)
+        """
+        # Determine size from hints or use defaults
+        width = 800
+        height = 600
+        if self.dimension_hint:
+            if self.dimension_hint.min_width > 0:
+                width = max(self.dimension_hint.min_width, 400)
+            if self.dimension_hint.min_height > 0:
+                height = max(self.dimension_hint.min_height, 300)
+
+        # Cascade position
+        x = area.x + (cascade_count % 10) * 30
+        y = area.y + (cascade_count % 10) * 30
+
+        self.floating_pos = (x, y)
+        self.floating_size = (width, height)
 
 
 class Decoration:

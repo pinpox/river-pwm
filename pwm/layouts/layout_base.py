@@ -253,6 +253,10 @@ class LayoutManager:
         pub.subscribe(self._on_switch_workspace, topics.CMD_SWITCH_WORKSPACE)
         pub.subscribe(self._on_move_to_workspace, topics.CMD_MOVE_TO_WORKSPACE)
 
+        # Floating command events
+        pub.subscribe(self._on_toggle_floating, topics.CMD_TOGGLE_FLOATING)
+        pub.subscribe(self._on_toggle_all_floating, topics.CMD_TOGGLE_ALL_FLOATING)
+
     def _on_focused_output_changed(self, output):
         """Track focused output from FocusManager."""
         self.focused_output = output
@@ -408,10 +412,26 @@ class LayoutManager:
             if ls_area.width > 0 and ls_area.height > 0:
                 area = ls_area
 
-        # All layouts now accept focused_window parameter
-        return workspace.layout.calculate(
-            workspace.windows, area, workspace.focused_window
+        # Filter out floating windows - only pass tiled windows to layout
+        tiled_windows = [w for w in workspace.windows if not w.is_floating]
+
+        # Calculate layout for tiled windows only
+        result = workspace.layout.calculate(
+            tiled_windows, area, workspace.focused_window
         )
+
+        # Add floating windows with their stored positions/sizes
+        for window in workspace.windows:
+            if window.is_floating and window.floating_pos and window.floating_size:
+                result[window] = LayoutGeometry(
+                    x=window.floating_pos[0],
+                    y=window.floating_pos[1],
+                    width=window.floating_size[0],
+                    height=window.floating_size[1],
+                    tiled_edges=WindowEdges.NONE,
+                )
+
+        return result
 
     # Command event handlers
     def _on_cycle_layout(self):
@@ -451,6 +471,7 @@ class LayoutManager:
         Delegates to CMD_FOCUS_NEXT so FocusManager properly updates focus.
         """
         from .. import topics
+
         # Tab cycling is the same as focusing next window
         self.bus.sendMessage(topics.CMD_FOCUS_NEXT)
 
@@ -460,6 +481,7 @@ class LayoutManager:
         Delegates to CMD_FOCUS_PREV so FocusManager properly updates focus.
         """
         from .. import topics
+
         # Tab cycling is the same as focusing previous window
         self.bus.sendMessage(topics.CMD_FOCUS_PREV)
 
@@ -483,3 +505,63 @@ class LayoutManager:
             workspace = self.get_active_workspace(self.focused_output)
             if workspace and workspace.focused_window:
                 self.move_window_to_workspace(workspace.focused_window, workspace_id)
+
+    def _on_toggle_floating(self):
+        """Handle CMD_TOGGLE_FLOATING command - toggle focused window."""
+        from pubsub import pub
+        from .. import topics
+
+        if not self.focused_output:
+            return
+
+        workspace = self.get_active_workspace(self.focused_output)
+        if not workspace or not workspace.focused_window:
+            return
+
+        window = workspace.focused_window
+        window.is_floating = not window.is_floating
+
+        # Initialize position/size if newly floating
+        if window.is_floating and (not window.floating_pos or not window.floating_size):
+            # Count existing floating windows for cascade
+            cascade_count = sum(1 for w in workspace.windows if w.is_floating)
+            # Get area from output
+            area = self.focused_output.area
+            if self.focused_output.layer_shell_output:
+                ls_area = self.focused_output.layer_shell_output.non_exclusive_area
+                if ls_area.width > 0 and ls_area.height > 0:
+                    area = ls_area
+            window.initialize_floating(area, cascade_count)
+
+        # Trigger layout recalculation
+        pub.sendMessage(topics.LAYOUT_CHANGED, layout_name="floating_toggled")
+
+    def _on_toggle_all_floating(self):
+        """Handle CMD_TOGGLE_ALL_FLOATING - toggle all windows in workspace."""
+        from pubsub import pub
+        from .. import topics
+
+        if not self.focused_output:
+            return
+
+        workspace = self.get_active_workspace(self.focused_output)
+        if not workspace:
+            return
+
+        # Determine target state (if any floating, make all tiled)
+        any_floating = any(w.is_floating for w in workspace.windows)
+        target_state = not any_floating
+
+        # Get area for initialization
+        area = self.focused_output.area
+        if self.focused_output.layer_shell_output:
+            ls_area = self.focused_output.layer_shell_output.non_exclusive_area
+            if ls_area.width > 0 and ls_area.height > 0:
+                area = ls_area
+
+        for i, window in enumerate(workspace.windows):
+            window.is_floating = target_state
+            if target_state and (not window.floating_pos or not window.floating_size):
+                window.initialize_floating(area, i)
+
+        pub.sendMessage(topics.LAYOUT_CHANGED, layout_name="all_floating_toggled")

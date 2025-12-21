@@ -178,6 +178,12 @@ class BindingManager:
             seat, XKB.Tab, mod | Modifiers.SHIFT, topics.CMD_CYCLE_TAB_BACKWARD
         )
 
+        # Floating window toggles
+        self.bind_key(seat, XKB.v, mod, topics.CMD_TOGGLE_FLOATING)
+        self.bind_key(
+            seat, XKB.v, mod | Modifiers.SHIFT, topics.CMD_TOGGLE_ALL_FLOATING
+        )
+
         # Workspace bindings: Mod+1-9
         num_workspaces = config.get("num_workspaces", 9)
         for i in range(1, num_workspaces + 1):

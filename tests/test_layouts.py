@@ -3,7 +3,7 @@ Unit tests for layout algorithms.
 """
 
 import pytest
-from pwm.layouts import TilingLayout, GridLayout, MonocleLayout, FloatingLayout
+from pwm.layouts import TilingLayout, GridLayout, MonocleLayout
 from pwm.layouts.layout_base import LayoutDirection
 from pwm.protocol import Area, WindowEdges
 
@@ -229,51 +229,3 @@ class TestMonocleLayout:
             assert geom.width == first_geom.width
             assert geom.height == first_geom.height
             assert geom.tiled_edges == first_geom.tiled_edges
-
-
-@pytest.mark.unit
-class TestFloatingLayout:
-    """Test floating layout calculations."""
-
-    def test_single_window_default_size(self, mock_window, standard_area):
-        """Single window uses default size and cascaded position."""
-        layout = FloatingLayout(default_width=800, default_height=600)
-        window = mock_window(object_id=1, width=0, height=0)  # No preferred size
-
-        result = layout.calculate([window], standard_area)
-
-        assert len(result) == 1
-        geom = result[window]
-        assert geom.width == 800
-        assert geom.height == 600
-        # First window at offset 50,50
-        assert geom.x == 50
-        assert geom.y == 50
-
-    def test_multiple_windows_cascade(self, mock_window, standard_area):
-        """Multiple windows cascade with offset."""
-        layout = FloatingLayout(default_width=800, default_height=600)
-        windows = [mock_window(object_id=i, width=0, height=0) for i in range(1, 4)]
-
-        result = layout.calculate(windows, standard_area)
-
-        assert len(result) == 3
-
-        # Windows should cascade with 30px offset
-        assert result[windows[0]].x == 50
-        assert result[windows[0]].y == 50
-        assert result[windows[1]].x == 50 + 30
-        assert result[windows[1]].y == 50 + 30
-        assert result[windows[2]].x == 50 + 60
-        assert result[windows[2]].y == 50 + 60
-
-    def test_window_with_preferred_size(self, mock_window, standard_area):
-        """Window with preferred size uses it."""
-        layout = FloatingLayout(default_width=800, default_height=600)
-        window = mock_window(object_id=1, width=1000, height=700)
-
-        result = layout.calculate([window], standard_area)
-
-        geom = result[window]
-        assert geom.width == 1000
-        assert geom.height == 700
