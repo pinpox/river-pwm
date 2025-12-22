@@ -518,13 +518,29 @@ class RiverWM:
 
         # Auto-float on move if not already floating
         if not window.is_floating:
-            window.is_floating = True
-            # Initialize from current geometry
+            # Get current geometry BEFORE setting floating
+            # (otherwise window won't be in layout calculation)
             geometries = self.layout_manager.calculate_layout(self.focused_output)
             if window in geometries:
                 geom = geometries[window]
+                # Now set floating and initialize position/size
+                window.is_floating = True
                 window.floating_pos = (geom.x, geom.y)
                 window.floating_size = (geom.width, geom.height)
+            else:
+                # Fallback if window not in geometries
+                window.is_floating = True
+                if self.focused_output:
+                    area = self.focused_output.area
+                    if self.focused_output.layer_shell_output:
+                        ls_area = self.focused_output.layer_shell_output.non_exclusive_area
+                        if ls_area.width > 0 and ls_area.height > 0:
+                            area = ls_area
+                    window.initialize_floating(area, 0)
+
+            # Trigger layout recalculation for immediate visual feedback
+            from pubsub import pub
+            pub.sendMessage(topics.LAYOUT_CHANGED, layout_name="move_auto_float")
 
         # Delegate to OperationManager
         self.operation_manager.start_move(seat, window)
@@ -536,12 +552,24 @@ class RiverWM:
 
         # Auto-float on resize
         if not window.is_floating:
-            window.is_floating = True
+            # Get current geometry BEFORE setting floating
             geometries = self.layout_manager.calculate_layout(self.focused_output)
             if window in geometries:
                 geom = geometries[window]
+                # Now set floating and initialize position/size
+                window.is_floating = True
                 window.floating_pos = (geom.x, geom.y)
                 window.floating_size = (geom.width, geom.height)
+            else:
+                # Fallback if window not in geometries
+                window.is_floating = True
+                if self.focused_output:
+                    area = self.focused_output.area
+                    if self.focused_output.layer_shell_output:
+                        ls_area = self.focused_output.layer_shell_output.non_exclusive_area
+                        if ls_area.width > 0 and ls_area.height > 0:
+                            area = ls_area
+                    window.initialize_floating(area, 0)
 
         window.inform_resize_start()
         # Delegate to OperationManager
@@ -671,9 +699,6 @@ class RiverWM:
                         self._make_border_config(self.config.border_color)
                     )
 
-                # Render per-window decorations (for tiled windows if not using layout decorations)
-                window.on_render_start()
-
                 window.show()
 
             # Render floating windows on top (always above tiled windows)
@@ -735,10 +760,11 @@ class RiverWM:
                     self.focused_output.area,
                 )
 
-            # Commit per-window decorations
+            # Commit per-window decorations (only for floating windows)
             for window in workspace.windows:
-                is_focused = window == workspace.focused_window
-                window.on_render_finish(focused=is_focused)
+                if window.is_floating:
+                    is_focused = window == workspace.focused_window
+                    window.on_render_finish(focused=is_focused)
 
             # Hide windows not in current workspace
             visible_windows = set(workspace.windows)
